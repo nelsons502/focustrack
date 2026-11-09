@@ -48,8 +48,9 @@ describe("SessionCard accessibility facts", () => {
       screen.getByText("Reserved accessible seating in every session"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Nearest quiet room: Salt Palace, Level 2, 260A"),
+      screen.getByText("Quiet room: Salt Palace, Level 2, 260A"),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/Nearest quiet room/)).not.toBeInTheDocument();
     const links = screen.getAllByRole("link", {
       name: "KubeCon inclusion & accessibility page",
     });
