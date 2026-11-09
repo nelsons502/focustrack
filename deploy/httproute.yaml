@@ -1,0 +1,17 @@
+# Inert inside the vcluster: the platform routes the public URL to Service app:80.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: app
+  namespace: team-focustrack
+spec:
+  parentRefs:
+    - name: cnh
+      namespace: gateway
+      sectionName: https
+  hostnames:
+    - "focustrack.cnh.radarhq.io"
+  rules:
+    - backendRefs:
+        - name: app
+          port: 80
