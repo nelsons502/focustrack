@@ -78,10 +78,6 @@ export default function SessionCard({
     session.noiseEstimate,
     session.noiseBasis,
   );
-  const quietRoom = ACCESSIBILITY_FACTS.nearestQuietRoom.replace(
-    /^Nearest quiet room:/,
-    "Quiet room:",
-  );
   return (
     <article className="card">
       <div className="card-head">
@@ -140,7 +136,7 @@ export default function SessionCard({
             : ACCESSIBILITY_FACTS.captionsUnconfirmed}
         </li>
         <li>{ACCESSIBILITY_FACTS.seating}</li>
-        <li>{quietRoom}</li>
+        <li>{ACCESSIBILITY_FACTS.quietRoom}</li>
       </ul>
       <details className="card-details">
         <summary>About quiet rooms</summary>
