@@ -33,6 +33,7 @@ export default function ExportCalendarButton() {
   );
   const [status, setStatus] = useState<ExportStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [missingCount, setMissingCount] = useState(0);
   const ids = localState.plan.sessionIds;
   const empty = ids.length === 0;
 
@@ -44,13 +45,16 @@ export default function ExportCalendarButton() {
         [...ids],
         new AbortController().signal,
       );
+      const missing = ids.filter(
+        (id) => !sessions.some((session) => session.id === id),
+      );
       const ordered = ids.flatMap((id) => {
         const match = sessions.find((session) => session.id === id);
         return match ? [match] : [];
       });
-      if (ordered.length !== ids.length) {
+      if (ordered.length === 0) {
         throw new Error(
-          "Some sessions in your plan could not be loaded, so no calendar file was made. Please try again shortly.",
+          "None of the sessions in your plan are in the current schedule.",
         );
       }
       downloadFile(
@@ -59,6 +63,7 @@ export default function ExportCalendarButton() {
           now: new Date(),
         }),
       );
+      setMissingCount(missing.length);
       setStatus("ready");
     } catch (error) {
       setErrorMessage(
@@ -87,7 +92,11 @@ export default function ExportCalendarButton() {
           : "Downloads a calendar file. Your own calendar settings decide any reminders; FocusTrack never sends notifications."}
       </p>
       <p role="status" aria-live="polite" className="export-calendar-status">
-        {status === "ready" ? "Calendar file ready" : ""}
+        {status === "ready"
+          ? missingCount > 0
+            ? `Calendar file ready. ${missingCount} session(s) are no longer in the schedule and were left out.`
+            : "Calendar file ready"
+          : ""}
       </p>
       {status === "error" ? (
         <p role="alert" className="export-calendar-error">

@@ -91,6 +91,65 @@ describe("ExportCalendarButton", () => {
     click.mockRestore();
   });
 
+  it("exports available sessions and announces sessions missing from the schedule", async () => {
+    storePlan(["s1", "stale"]);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve([makeSession()]),
+        } as Response),
+      ),
+    );
+    const createObjectURL = vi.fn(() => "blob:test");
+    Object.assign(URL, { createObjectURL });
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
+
+    render(<ExportCalendarButton />);
+    const button = await screen.findByRole("button", {
+      name: /add my plan to my calendar/i,
+    });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Calendar file ready. 1 session(s) are no longer in the schedule and were left out.",
+      ),
+    );
+    expect(click).toHaveBeenCalled();
+    expect(createObjectURL).toHaveBeenCalled();
+    click.mockRestore();
+  });
+
+  it("shows an error when none of the planned sessions are in the schedule", async () => {
+    storePlan(["stale"]);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve([]),
+        } as Response),
+      ),
+    );
+    render(<ExportCalendarButton />);
+    const button = await screen.findByRole("button", {
+      name: /add my plan to my calendar/i,
+    });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "None of the sessions in your plan are in the current schedule.",
+      ),
+    );
+  });
+
   it("shows a friendly error when sessions cannot be loaded", async () => {
     storePlan(["s1"]);
     vi.stubGlobal(
