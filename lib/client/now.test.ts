@@ -174,11 +174,23 @@ describe("now-actions", () => {
     expect(undoLastNote(createDefaultLocalState(), "a").notes).toEqual({});
   });
 
-  it("moves a session to notAttending and restores it", () => {
+  it("moves a session to notAttending without removing planned breaks", () => {
     const base = createDefaultLocalState();
     base.plan.sessionIds = ["a", "b"];
+    base.plan.breaks = [
+      {
+        id: "break-1",
+        startsAt: "2026-11-10T11:00:00-07:00",
+        endsAt: "2026-11-10T11:20:00-07:00",
+        room: "Salt Palace, Level 2, 260A",
+      },
+    ];
     const skipped = markNotAttending(base, "a");
-    expect(skipped.plan).toEqual({ sessionIds: ["b"], notAttending: ["a"] });
+    expect(skipped.plan).toEqual({
+      sessionIds: ["b"],
+      notAttending: ["a"],
+      breaks: base.plan.breaks,
+    });
     const restored = undoNotAttending(skipped, "a");
     expect(restored.plan.sessionIds).toContain("a");
     expect(restored.plan.notAttending).toEqual([]);

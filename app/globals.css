@@ -151,10 +151,6 @@ main .app-name {
   display: none;
 }
 
-body:has(.demo-bar) {
-  padding-bottom: 5.5rem;
-}
-
 body:has(.now-page) .site-header {
   background: #141a22;
   color: #dde3ea;

@@ -6,9 +6,9 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
-  type FormEvent,
   type KeyboardEvent,
 } from "react";
+import "./now/now.css";
 import type { Session } from "../lib/contract";
 import {
   ACCESSIBILITY_SOURCE_URL,
@@ -22,27 +22,30 @@ import {
   subscribeLocalState,
   updateLocalState,
 } from "../lib/client/local-state";
+import { getNow, getSimClock, useNow } from "../lib/client/clock";
 import {
   describeStartsIn,
   formatDemoLabel,
   minutesUntil,
   resolveNow,
-  selectCurrentAndNext,
   transitionNote,
   withNowParam,
 } from "../lib/client/now";
+import { markNotAttending, undoNotAttending } from "../lib/client/now-actions";
 import {
-  addNote,
-  markNotAttending,
-  undoLastNote,
-  undoNotAttending,
-} from "../lib/client/now-actions";
+  applyNotepadText,
+  dismissReflect,
+  isHeadsUp,
+  isReflectDismissed,
+  notesToDraft,
+  selectNowTimeline,
+  setNowOptOut,
+} from "./now/now-helpers";
 import { fetchSessionsByIds } from "../lib/client/sessions-api";
 import { formatEventTime } from "../lib/client/time";
 import PrimaryNav from "./plan/PrimaryNav";
 
-const CLOCK_TICK_MS = 30_000;
-const NOTES_SHOWN = 3;
+const NOTE_DEBOUNCE_MS = 500;
 
 function subscribeNothing(): () => void {
   return () => undefined;
@@ -67,7 +70,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
     getLocalStateSnapshot,
     getLocalStateServerSnapshot,
   );
-  const [realNow, setRealNow] = useState(() => new Date());
+  const liveNow = useNow();
   const [known, setKnown] = useState<Record<string, Session>>({});
   const [loadError, setLoadError] = useState("");
   const [loadingIds, setLoadingIds] = useState(false);
@@ -75,26 +78,25 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   const [announcement, setAnnouncement] = useState("");
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesSession, setNotesSession] = useState<Session | null>(null);
-  const [lastSavedFor, setLastSavedFor] = useState<string | null>(null);
   const [draft, setDraft] = useState({ text: "", sessionId: "" });
+  const draftRef = useRef(draft);
   const [skipped, setSkipped] = useState<Session | null>(null);
   const [retryToken, setRetryToken] = useState(0);
+  const [reflectTick, setReflectTick] = useState(0);
   const toggleRef = useRef<HTMLButtonElement>(null);
-  const noteInputRef = useRef<HTMLInputElement>(null);
+  const noteInputRef = useRef<HTMLTextAreaElement>(null);
   const skipButtonRef = useRef<HTMLButtonElement>(null);
   const undoSkipRef = useRef<HTMLButtonElement>(null);
   const focusAfterSkip = useRef<"undo" | "skip" | null>(null);
 
-  const { now, demo } = useMemo(
-    () => resolveNow(nowParam, realNow),
-    [nowParam, realNow],
-  );
-
-  useEffect(() => {
-    if (demo) return undefined;
-    const timer = window.setInterval(() => setRealNow(new Date()), CLOCK_TICK_MS);
-    return () => window.clearInterval(timer);
-  }, [demo]);
+  // An active sim outranks an explicit ?now= param, matching getNow(); the
+  // param still drives SSR/tests when no sim is running. useNow re-renders
+  // every second and on clock events, so this read stays current.
+  const simActive = mounted && getSimClock() !== null;
+  const resolved = useMemo(() => resolveNow(nowParam, liveNow), [nowParam, liveNow]);
+  const now = simActive ? liveNow : resolved.now;
+  const demo = simActive || resolved.demo;
+  const clockReady = now.getTime() !== 0;
 
   const planIds = localState.plan.sessionIds;
   const planKey = planIds.join(",");
@@ -134,10 +136,16 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   }, [mounted, planKey, retryToken]);
 
   const sessions = useMemo(() => Object.values(known), [known]);
-  const { current, next, previous } = useMemo(
-    () => selectCurrentAndNext(sessions, planIds, now),
-    [sessions, planIds, now],
+  const planBreaks = useMemo(() => localState.plan.breaks ?? [], [localState.plan.breaks]);
+  const timeline = useMemo(
+    () => selectNowTimeline(sessions, planIds, planBreaks, now),
+    [sessions, planIds, planBreaks, now],
   );
+  const current = timeline.currentTalk;
+  const currentBreak = timeline.currentBreak;
+  const next = timeline.nextTalk;
+  const nextItem = timeline.nextItem;
+  const previous = timeline.previousTalk;
 
   useEffect(() => {
     if (focusAfterSkip.current === "undo" && skipped) {
@@ -151,30 +159,50 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
 
   const findHref = withNowParam("/", nowParam);
   const noteTarget = notesOpen && notesSession ? notesSession : current;
-  const targetNotes = noteTarget ? (localState.notes[noteTarget.id] ?? []) : [];
-  const recentNotes = targetNotes.slice(-NOTES_SHOWN).reverse();
-  const canUndoNote =
-    lastSavedFor !== null &&
-    lastSavedFor === noteTarget?.id &&
-    (localState.notes[lastSavedFor]?.length ?? 0) > 0;
 
-  function saveDraft(): boolean | null {
-    if (!draft.sessionId || !draft.text.trim()) return null;
-    const saved = updateLocalState(
-      addNote(getLocalStateSnapshot(), draft.sessionId, draft.text, new Date()),
-    );
-    setDraft({ text: "", sessionId: "" });
-    setLastSavedFor(draft.sessionId);
-    setAnnouncement(
-      saved
-        ? "Note saved on this device."
-        : "Note kept for now, but saving on this device failed.",
-    );
-    return saved;
+  function flushDraft(): void {
+    const pending = draftRef.current;
+    if (!pending.sessionId) return;
+    draftRef.current = { text: "", sessionId: "" };
+    const latest = getLocalStateSnapshot();
+    const nextState = applyNotepadText(latest, pending.sessionId, pending.text, getNow());
+    if (nextState === latest) return;
+    const saved = updateLocalState(nextState);
+    setAnnouncement(saved ? "Saved" : "Saving on this device failed.");
+  }
+  const flushDraftRef = useRef(flushDraft);
+
+  useEffect(() => {
+    if (!notesOpen || !draft.sessionId) return undefined;
+    if (notesToDraft(getLocalStateSnapshot().notes[draft.sessionId]) === draft.text) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => flushDraftRef.current(), NOTE_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [notesOpen, draft]);
+
+  useEffect(() => {
+    const onPageHide = () => flushDraftRef.current();
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      window.removeEventListener("pagehide", onPageHide);
+      flushDraftRef.current();
+    };
+  }, []);
+
+  function openNotes() {
+    if (!current) return;
+    flushDraft();
+    const text = notesToDraft(getLocalStateSnapshot().notes[current.id]);
+    const nextDraft = { text, sessionId: current.id };
+    draftRef.current = nextDraft;
+    setDraft(nextDraft);
+    setNotesSession(current);
+    setNotesOpen(true);
   }
 
   function closeNotes() {
-    saveDraft();
+    flushDraft();
     setNotesOpen(false);
     toggleRef.current?.focus();
   }
@@ -182,20 +210,6 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   useEffect(() => {
     if (notesOpen) noteInputRef.current?.focus();
   }, [notesOpen]);
-
-  function handleSaveNote(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    saveDraft();
-    noteInputRef.current?.focus();
-  }
-
-  function handleUndoNote() {
-    if (!lastSavedFor) return;
-    updateLocalState(undoLastNote(getLocalStateSnapshot(), lastSavedFor));
-    setLastSavedFor(null);
-    setAnnouncement("Last note removed.");
-    noteInputRef.current?.focus();
-  }
 
   function handleNotesKey(event: KeyboardEvent<HTMLElement>) {
     if (event.key === "Escape") {
@@ -207,7 +221,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   function handleNotAttending() {
     if (!current) return;
     const title = current.title;
-    saveDraft();
+    flushDraft();
     setSkipped(current);
     setNotesOpen(false);
     updateLocalState(markNotAttending(getLocalStateSnapshot(), current.id));
@@ -224,8 +238,15 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   }
 
   const nextNote = next ? transitionNote(current ?? previous, next) : null;
-  const ready = mounted && (planIds.length === 0 || !loadingIds || sessions.length > 0);
-  const showEmpty = ready && !loadError && !current && !next;
+  const ready =
+    mounted && clockReady && (planIds.length === 0 || !loadingIds || sessions.length > 0);
+  const showEmpty = ready && !loadError && !current && !currentBreak && !nextItem;
+  void reflectTick;
+  const reflectCandidate =
+    ready && !loadError ? timeline.reflectCandidate : null;
+  const showReflect =
+    reflectCandidate !== null && mounted && !isReflectDismissed(reflectCandidate.id);
+  const headsUp = nextItem !== null && isHeadsUp(now, nextItem.startsAt);
 
   return (
     <div className="now-page">
@@ -240,6 +261,14 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
               <span>(event time, not the live clock)</span>
             </p>
           ) : null}
+          <p className="now-browse-row">
+            <a className="now-button" href={findHref} onClick={() => {
+              flushDraft();
+              setNowOptOut();
+            }}>
+              Browse talks instead
+            </a>
+          </p>
         </header>
 
         <div className="visually-hidden" role="status" aria-live="polite">
@@ -327,9 +356,58 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
           </section>
         ) : null}
 
-        {ready && !loadError && next ? (
+        {ready && !loadError && !current && currentBreak ? (
+          <section className="now-card" aria-labelledby="now-break-title">
+            <h2 className="now-label">On a break</h2>
+            <p id="now-break-title" className="now-big">
+              Break
+            </p>
+            <p className="now-place">{currentBreak.room}</p>
+            <p className="now-ends">
+              Ends at{" "}
+              <time dateTime={currentBreak.endsAt}>
+                {formatEventTime(currentBreak.endsAt)}
+              </time>
+            </p>
+          </section>
+        ) : null}
+
+        {showReflect && reflectCandidate ? (
+          <section className="now-card now-reflect" aria-labelledby="now-reflect-title">
+            <h2 id="now-reflect-title" className="now-label">
+              Reflect on {reflectCandidate.title}?
+            </h2>
+            <p className="now-muted">It just ended. A few quiet words can help it stick.</p>
+            <div className="now-actions">
+              <a
+                className="now-button now-button-primary"
+                href={withNowParam("/reflect", nowParam)}
+                aria-label={`Reflect on ${reflectCandidate.title}`}
+              >
+                Reflect
+              </a>
+              <button
+                type="button"
+                className="now-button"
+                onClick={() => {
+                  dismissReflect(reflectCandidate.id);
+                  setReflectTick((value) => value + 1);
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        {ready && !loadError && next && nextItem?.kind === "talk" ? (
           <section className="now-card" aria-labelledby="now-next-title">
             <h2 className="now-label">Next</h2>
+            {headsUp ? (
+              <p className="now-heads-up">
+                Next: {next.title} in {minutesUntil(next.startsAt, now)} min · {place(next)}
+              </p>
+            ) : null}
             <p id="now-next-title" className="now-big now-big-next">
               {next.title}
             </p>
@@ -350,6 +428,28 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
           </section>
         ) : null}
 
+        {ready && !loadError && nextItem?.kind === "break" ? (
+          <section className="now-card" aria-labelledby="now-next-break-title">
+            <h2 className="now-label">Next</h2>
+            {headsUp ? (
+              <p className="now-heads-up">
+                Next: Break in {minutesUntil(nextItem.planBreak.startsAt, now)} min ·{" "}
+                {nextItem.planBreak.room}
+              </p>
+            ) : null}
+            <p id="now-next-break-title" className="now-big now-big-next">
+              Break
+            </p>
+            <p className="now-place">{nextItem.planBreak.room}</p>
+            <p className="now-ends">
+              <time dateTime={nextItem.planBreak.startsAt}>
+                {describeStartsIn(minutesUntil(nextItem.planBreak.startsAt, now))}
+              </time>
+              , at {formatEventTime(nextItem.planBreak.startsAt)}
+            </p>
+          </section>
+        ) : null}
+
         {ready && !loadError && noteTarget ? (
           <section className="now-notes" aria-label="Quick notes">
             <button
@@ -358,15 +458,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
               className="now-button now-toggle"
               aria-expanded={notesOpen}
               aria-controls="now-notes-drawer"
-              onClick={() => {
-                if (notesOpen) {
-                  closeNotes();
-                } else {
-                  if (current?.id !== notesSession?.id) setLastSavedFor(null);
-                  setNotesSession(current);
-                  setNotesOpen(true);
-                }
-              }}
+              onClick={() => (notesOpen ? closeNotes() : openNotes())}
             >
               {notesOpen ? "Close notes" : "Quick notes"}
             </button>
@@ -378,46 +470,25 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
                 aria-label={`Notes for ${noteTarget.title}`}
                 onKeyDown={handleNotesKey}
               >
-                <form onSubmit={handleSaveNote} className="now-note-form">
-                  <label htmlFor="now-note-input">One line at a time. Press Enter, Save note, or Close notes to save on this device.</label>
-                  <div className="now-note-row">
-                    <input
-                      ref={noteInputRef}
-                      id="now-note-input"
-                      type="text"
-                      value={draft.text}
-                      maxLength={280}
-                      autoComplete="off"
-                      enterKeyHint="done"
-                      onChange={(event) =>
-                        setDraft((previousDraft) => ({
-                          text: event.target.value,
-                          sessionId: previousDraft.sessionId || noteTarget.id,
-                        }))
-                      }
-                    />
-                    <button type="submit" className="now-button now-button-primary">
-                      Save note
-                    </button>
-                  </div>
-                </form>
-                <div className="now-note-tools">
-                  <button
-                    type="button"
-                    className="now-button"
-                    onClick={handleUndoNote}
-                    disabled={!canUndoNote}
-                  >
-                    Undo last note
-                  </button>
+                <div className="now-note-form">
+                  <label htmlFor="now-note-input">
+                    Notes. Write freely. Saves on this device as you type.
+                  </label>
+                  <textarea
+                    ref={noteInputRef}
+                    id="now-note-input"
+                    className="now-notepad"
+                    value={draft.sessionId === noteTarget.id ? draft.text : ""}
+                    rows={6}
+                    autoComplete="off"
+                    enterKeyHint="done"
+                    onChange={(event) => {
+                      const nextDraft = { text: event.target.value, sessionId: noteTarget.id };
+                      draftRef.current = nextDraft;
+                      setDraft(nextDraft);
+                    }}
+                  />
                 </div>
-                {recentNotes.length > 0 ? (
-                  <ul className="now-note-list" aria-label="Latest notes">
-                    {recentNotes.map((note) => (
-                      <li key={note.at + note.text}>{note.text}</li>
-                    ))}
-                  </ul>
-                ) : null}
               </div>
             ) : null}
           </section>
