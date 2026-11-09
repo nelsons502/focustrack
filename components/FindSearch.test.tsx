@@ -104,16 +104,15 @@ describe("FindSearch", () => {
     expect(screen.getByText(/Ada Example/)).toBeInTheDocument();
     expect(screen.getByText("Sold out")).toBeInTheDocument();
     expect(screen.getByText(/All-access pass/)).toBeInTheDocument();
-    expect(screen.getByText(/Wordly/)).toBeInTheDocument();
+    expect(screen.getByText(/Live captions: Wordly/)).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /accessibility/i }),
+      screen.getByRole("link", { name: /inclusion & accessibility/i }),
     ).toHaveAttribute(
       "href",
       "https://events.linuxfoundation.org/kubecon-cloudnativecon-north-america/attend/inclusion-accessibility/",
     );
-    expect(screen.getByText(/Crowd estimate: large/)).toBeInTheDocument();
-    expect(screen.getByText(/keynote hall/)).toBeInTheDocument();
-    expect(screen.getByText(/Noise estimate: unknown/)).toBeInTheDocument();
+    expect(screen.getByText(/Crowd: likely large \(estimate: keynote hall\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Noise: unknown/)).toBeInTheDocument();
   });
 
   it("does not claim captions when captions are unknown", async () => {
@@ -122,7 +121,8 @@ describe("FindSearch", () => {
     await screen.findByRole("heading", {
       name: "Kubernetes Basics Test Session",
     });
-    expect(screen.queryByText(/Wordly/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Live captions/)).not.toBeInTheDocument();
+    expect(screen.getByText("Captions: not confirmed")).toBeInTheDocument();
   });
 
   it("ignores malformed sessions without breaking valid search results", async () => {
@@ -268,7 +268,7 @@ describe("FindSearch", () => {
     const add = await screen.findByRole("button", {
       name: "Add to plan: Kubernetes Basics Test Session",
     });
-    expect(add).not.toHaveAttribute("aria-pressed");
+    expect(add).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(add);
     const raw = window.localStorage.getItem(LOCAL_STATE_KEY);
     expect(raw).not.toBeNull();
@@ -278,9 +278,9 @@ describe("FindSearch", () => {
     expect(saved.energy.flagLoudRooms).toBe(true);
     expect(
       screen.getByRole("button", {
-        name: "In your plan — remove: Kubernetes Basics Test Session",
+        name: "Add to plan: Kubernetes Basics Test Session",
       }),
-    ).toHaveTextContent("In your plan — remove");
+    ).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText(/added to your plan/)).toBeInTheDocument();
   });
 
