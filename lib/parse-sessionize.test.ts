@@ -1,8 +1,9 @@
+import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseSessionize } from './parse-sessionize.ts';
-const schedule = readFileSync(new URL('./__fixtures__/schedule.md', import.meta.url), 'utf8');
-const detail = readFileSync(new URL('./__fixtures__/session.md', import.meta.url), 'utf8');
+const schedule = readFileSync(join(process.cwd(), 'lib/__fixtures__/schedule.md'), 'utf8');
+const detail = readFileSync(join(process.cwd(), 'lib/__fixtures__/session.md'), 'utf8');
 
 describe('Sessionize real Markdown excerpts', () => {
   it('uses local ISO times, room metadata, description and speaker affiliation', () => {

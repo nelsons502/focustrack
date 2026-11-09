@@ -1,9 +1,10 @@
+import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createElasticClient, indexSessions, sessionsMapping } from './elastic.ts';
 import { parseSessionize } from './parse-sessionize.ts';
 import { readFileSync } from 'node:fs';
 import { Client } from '@elastic/elasticsearch';
-const sessions = () => parseSessionize(readFileSync(new URL('./__fixtures__/schedule.md', import.meta.url), 'utf8'));
+const sessions = () => parseSessionize(readFileSync(join(process.cwd(), 'lib/__fixtures__/schedule.md'), 'utf8'));
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 describe('Elastic ingestion', () => {
   it('requires both credentials without leaking their values', () => {
