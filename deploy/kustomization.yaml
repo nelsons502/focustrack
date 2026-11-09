@@ -3,10 +3,11 @@ kind: Kustomization
 namespace: team-focustrack
 resources:
   - deployment.yaml
+  - pdb.yaml
   - service.yaml
   - httproute.yaml
 # The image workflow owns this tag after the initial build.
 images:
   - name: app
     newName: ghcr.io/nelsons502/focustrack
-    newTag: ece69d8eed2864d57bfc2840083dea30bdd763f8
+    newTag: 72f3039e61e1105216f8d0763342852a7ff64d9c

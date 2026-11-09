@@ -3,7 +3,18 @@ import * as fs from 'node:fs/promises';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createMarkdownFetcher, parseOptions } from './ingest.ts';
+import { createMarkdownFetcher, main, parseOptions } from './ingest.ts';
+
+const cli = vi.hoisted(() => ({
+  shutdown: vi.fn(async () => undefined),
+  close: vi.fn(async () => undefined),
+  createClient: vi.fn(),
+}));
+vi.mock('../lib/telemetry/node-cli.ts', () => ({ initNodeTelemetry: () => ({ shutdown: cli.shutdown }) }));
+vi.mock('../lib/elastic.ts', async importOriginal => ({
+  ...await importOriginal<typeof import('../lib/elastic.ts')>(),
+  createElasticClient: cli.createClient,
+}));
 it('accepts an event-local day and explicit recreation', () => {
   expect(parseOptions(['--day=2026-11-10','--recreate'])).toEqual({day:'2026-11-10',recreate:true});
   expect(parseOptions([])).toEqual({recreate:false});
@@ -144,4 +155,25 @@ it.each(['write', 'rename'])('cleans up after a failed %s and preserves previous
   await expect(fetchMarkdown('1.md', `${sourceUrl}/session/1`)).rejects.toThrow('disk failure');
   expect(await readFile(file, 'utf8')).toBe(previous);
   expect(await readdir(directory)).toEqual(['1.md']);
+});
+
+it('shuts telemetry down when the Elastic client cannot be created', async () => {
+  vi.spyOn(process, 'argv', 'get').mockReturnValue(['node', 'ingest.ts']);
+  cli.createClient.mockImplementationOnce(() => { throw new Error('missing ES_URL'); });
+  await expect(main()).rejects.toThrow('missing ES_URL');
+  expect(cli.shutdown).toHaveBeenCalledTimes(1);
+});
+
+it('shuts telemetry down when option parsing or client closing throws', async () => {
+  vi.spyOn(process, 'argv', 'get').mockReturnValue(['node', 'ingest.ts', '--bogus']);
+  cli.createClient.mockReturnValueOnce({ close: cli.close });
+  await expect(main()).rejects.toThrow('Unknown option');
+  expect(cli.shutdown).toHaveBeenCalledTimes(1);
+  cli.shutdown.mockClear();
+  vi.spyOn(process, 'argv', 'get').mockReturnValue(['node', 'ingest.ts', '--day=2099-01-01']);
+  cli.createClient.mockReturnValueOnce({ close: async () => { throw new Error('close failed'); } });
+  vi.spyOn(fs, 'readFile').mockResolvedValueOnce('# x');
+  vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('offline'));
+  await expect(main()).rejects.toThrow();
+  expect(cli.shutdown).toHaveBeenCalledTimes(1);
 });

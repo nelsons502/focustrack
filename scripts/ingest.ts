@@ -6,6 +6,8 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { createElasticClient, indexSessions } from '../lib/elastic.ts';
 import { parseSessionize } from '../lib/parse-sessionize.ts';
 import { loadSummaries, mergeSummaries } from '../lib/summaries.ts';
+import { initNodeTelemetry } from '../lib/telemetry/node-cli.ts';
+import { traceElasticOperation } from '../lib/telemetry/trace-elastic.ts';
 
 export const source = 'https://sessionize.com/api/v2/uo948i5p/view/markdown';
 
@@ -67,6 +69,16 @@ export function createMarkdownFetcher(cacheDirectory = '.cache', alwaysFetch: Re
 }
 
 export async function main(): Promise<void> {
+  const telemetry = initNodeTelemetry({
+    DASH0_OTLP_ENDPOINT: process.env.DASH0_OTLP_ENDPOINT,
+    DASH0_AUTH_TOKEN: process.env.DASH0_AUTH_TOKEN,
+  });
+  try {
+    await ingest();
+  } finally { await telemetry.shutdown(); }
+}
+
+async function ingest(): Promise<void> {
   const options = parseOptions(process.argv.slice(2));
   const client = createElasticClient();
   const started = performance.now();
@@ -84,7 +96,12 @@ export async function main(): Promise<void> {
     const parsed = parseSessionize(list, details).filter(session => !options.day || session.day === options.day);
     const { sessions, unmatched } = mergeSummaries(parsed, await loadSummaries());
     console.log(`Merged ${sessions.filter(session => session.plainSummary).length} reviewed plain-language summaries${unmatched.length ? `; ${unmatched.length} summary IDs not in this selection: ${unmatched.join(', ')}` : ''}.`);
-    await indexSessions(client, sessions, options.recreate);
+    await traceElasticOperation('elastic.ingest', {operation:'ingest'}, async controls => {
+      const indexStarted = performance.now();
+      const indexed = await indexSessions(client, sessions, options.recreate);
+      controls.setSafeAttributes({tookMs: Math.max(0, Math.round(performance.now() - indexStarted)), resultCount: indexed});
+      return indexed;
+    });
     console.log(`Total ingest elapsed ${((performance.now()-started)/1000).toFixed(2)}s.`);
   } finally { await client.close(); }
 }
