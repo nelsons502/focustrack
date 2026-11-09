@@ -88,15 +88,6 @@ function storedState(): LocalState {
   ) as LocalState;
 }
 
-async function renderAndLoadPlan() {
-  const view = render(<PlanView />);
-  const loadButton = screen.queryByRole("button", {
-    name: "Load saved sessions from schedule service",
-  });
-  if (loadButton) fireEvent.click(loadButton);
-  return view;
-}
-
 beforeEach(() => {
   window.localStorage.clear();
   updateLocalState(createDefaultLocalState());
@@ -111,7 +102,7 @@ describe("PlanView", () => {
   it("shows an honest empty plan without any network request", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    await renderAndLoadPlan();
+    render(<PlanView />);
     expect(
       (await screen.findAllByText(/Your plan is empty/)).length,
     ).toBeGreaterThan(0);
@@ -121,19 +112,15 @@ describe("PlanView", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("asks before sending saved session IDs for schedule lookups", async () => {
+  it("looks up saved session IDs automatically and discloses it", async () => {
     savePlan(["s1"]);
     const fetchMock = vi.fn(async () => jsonResponse([makeSession()]));
     vi.stubGlobal("fetch", fetchMock);
     render(<PlanView />);
     expect(await screen.findByText(/stored only on this device/)).toBeInTheDocument();
-    expect(screen.getByText(/only after you choose to load them/)).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Load saved sessions from schedule service",
-      }),
-    );
+    expect(
+      screen.getByText(/the schedule service receives your saved session IDs/),
+    ).toBeInTheDocument();
     expect(
       await screen.findByRole("heading", { name: "Morning Talk" }),
     ).toBeInTheDocument();
@@ -154,7 +141,7 @@ describe("PlanView", () => {
         kind: "keynote",
       }),
     ]);
-    await renderAndLoadPlan();
+    render(<PlanView />);
     expect(
       await screen.findByRole("heading", { name: "Morning Talk" }),
     ).toBeInTheDocument();
@@ -195,7 +182,7 @@ describe("PlanView", () => {
       )
       .mockResolvedValue(jsonResponse([makeSession()]));
     vi.stubGlobal("fetch", fetchMock);
-    await renderAndLoadPlan();
+    render(<PlanView />);
     expect(
       await screen.findByText(/temporarily unavailable/),
     ).toBeInTheDocument();
@@ -208,7 +195,7 @@ describe("PlanView", () => {
   it("names saved sessions missing from the schedule and can remove them", async () => {
     savePlan(["s1", "gone1"]);
     mockSessions([makeSession()]);
-    await renderAndLoadPlan();
+    render(<PlanView />);
     expect(
       await screen.findByText(/no longer in the schedule/),
     ).toBeInTheDocument();
@@ -226,7 +213,7 @@ describe("PlanView", () => {
   it("removes a timeline session from the on-device plan", async () => {
     savePlan(["s1"]);
     mockSessions([makeSession()]);
-    await renderAndLoadPlan();
+    render(<PlanView />);
     fireEvent.click(
       await screen.findByRole("button", {
         name: "Remove from plan: Morning Talk",
@@ -255,7 +242,7 @@ describe("PlanView", () => {
           }),
       ),
     );
-    await renderAndLoadPlan();
+    render(<PlanView />);
     expect(
       (await screen.findAllByText(/Loading your saved sessions/)).length,
     ).toBeGreaterThan(0);
@@ -279,7 +266,7 @@ describe("PlanView", () => {
         noiseBasis: "expo-floor room",
       }),
     ]);
-    await renderAndLoadPlan();
+    render(<PlanView />);
     expect(
       await screen.findByRole("heading", { name: "Tuesday Talk" }),
     ).toBeInTheDocument();
@@ -319,7 +306,7 @@ describe("PlanView", () => {
         endsAt: "2026-11-10T18:00:00Z",
       }),
     ]);
-    await renderAndLoadPlan();
+    render(<PlanView />);
     expect(
       await screen.findByText(/4 sessions in a row/),
     ).toBeInTheDocument();
@@ -347,7 +334,7 @@ describe("PlanView", () => {
         endsAt: "2026-11-10T17:30:00Z",
       }),
     ]);
-    await renderAndLoadPlan();
+    render(<PlanView />);
     expect(await screen.findByText(/overlap in time/)).toBeInTheDocument();
     expect(screen.getByText(/hours of sessions this day/)).toBeInTheDocument();
     expect(screen.getByText(/Your limit is 5 hours/)).toBeInTheDocument();
@@ -364,7 +351,7 @@ describe("PlanView", () => {
         endsAt: "2026-11-10T17:05:00Z",
       }),
     ]);
-    await renderAndLoadPlan();
+    render(<PlanView />);
     expect(
       await screen.findByText(/Only 5 minutes between/),
     ).toBeInTheDocument();
@@ -387,7 +374,7 @@ describe("PlanView", () => {
         endsAt: "2026-11-10T17:30:00Z",
       }),
     ]);
-    await renderAndLoadPlan();
+    render(<PlanView />);
     expect(
       await screen.findByText(/20 minutes in the quiet room/),
     ).toBeInTheDocument();
@@ -429,13 +416,13 @@ describe("PlanView", () => {
         endsAt: "2026-11-10T17:30:00Z",
       }),
     ]);
-    const view = await renderAndLoadPlan();
+    const view = render(<PlanView />);
     expect(
       await screen.findByRole("heading", { name: "Quiet-room break" }),
     ).toBeInTheDocument();
     // Simulate a reload: unmount and render again from stored state.
     view.unmount();
-    await renderAndLoadPlan();
+    render(<PlanView />);
     expect(
       await screen.findByRole("heading", { name: "Quiet-room break" }),
     ).toBeInTheDocument();
@@ -460,7 +447,7 @@ describe("PlanView", () => {
       { ...gapBreak, startsAt: "2026-11-10T16:10:00.000Z", endsAt: "2026-11-10T16:40:00.000Z" },
     ]);
     mockSessions([makeSession({ id: "a", title: "Solo Talk" })]);
-    await renderAndLoadPlan();
+    render(<PlanView />);
     expect(
       await screen.findByRole("heading", { name: "Solo Talk" }),
     ).toBeInTheDocument();
@@ -514,7 +501,7 @@ describe("PlanView", () => {
       });
     });
     vi.stubGlobal("fetch", fetchMock);
-    await renderAndLoadPlan();
+    render(<PlanView />);
     expect(
       await screen.findByRole("button", { name: "Drop Talk D from plan" }),
     ).toBeInTheDocument();
@@ -525,17 +512,6 @@ describe("PlanView", () => {
         plan: { ...current.plan, sessionIds: [...current.plan.sessionIds, "e"] },
       });
     });
-    expect(
-      screen.getByRole("button", {
-        name: "Load saved sessions from schedule service",
-      }),
-    ).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Load saved sessions from schedule service",
-      }),
-    );
     expect(
       await screen.findByText(/Loading your saved sessions/),
     ).toBeInTheDocument();
@@ -579,7 +555,7 @@ describe("PlanView", () => {
       });
     });
     vi.stubGlobal("fetch", fetchMock);
-    await renderAndLoadPlan();
+    render(<PlanView />);
     expect(
       await screen.findByRole("heading", { name: "Quiet-room break" }),
     ).toBeInTheDocument();
@@ -594,11 +570,6 @@ describe("PlanView", () => {
         plan: { ...current.plan, sessionIds: [...current.plan.sessionIds, "e"] },
       });
     });
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Load saved sessions from schedule service",
-      }),
-    );
     expect(
       await screen.findByText(/Loading your saved sessions/),
     ).toBeInTheDocument();
@@ -628,7 +599,7 @@ describe("PlanView", () => {
         endsAt: "2026-11-10T17:30:00Z",
       }),
     ]);
-    await renderAndLoadPlan();
+    render(<PlanView />);
     expect(
       await screen.findByRole("heading", { name: "Quiet-room break" }),
     ).toBeInTheDocument();
@@ -669,7 +640,7 @@ describe("PlanView", () => {
         endsAt: "2026-11-11T17:30:00Z",
       }),
     ]);
-    await renderAndLoadPlan();
+    render(<PlanView />);
     fireEvent.click(
       screen.getByRole("button", { name: /Remove quiet-room break/ }),
     );
@@ -690,7 +661,7 @@ describe("PlanView", () => {
         endsAt: "2026-11-10T17:00:00Z",
       }),
     ]);
-    await renderAndLoadPlan();
+    render(<PlanView />);
     await screen.findByRole("heading", { name: "First Talk" });
     expect(
       screen.queryByText(/sessions in a row/),
@@ -730,7 +701,7 @@ describe("PlanView", () => {
         noiseBasis: "expo-floor room",
       }),
     ]);
-    await renderAndLoadPlan();
+    render(<PlanView />);
     expect(
       await screen.findByText(/is in a room estimated to be loud/),
     ).toBeInTheDocument();
