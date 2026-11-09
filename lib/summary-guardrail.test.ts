@@ -77,4 +77,11 @@ describe('summary guardrail', () => {
     expect(checkSummary('This talk helps." This talk covers clusters." This talk covers clusters.', plain))
       .toEqual({ ok: false, reason: 'more than 2 sentences' });
   });
+
+  it('keeps fractions and signs as part of a number', () => {
+    const numbers = { title: 'Clusters', description: 'We run 3 clusters across 14 regions at 40 percent, in a 10-20 node range.' };
+    expect(checkSummary('This talk covers 3/14 clusters.', numbers)).toEqual({ ok: false, reason: 'unsupported number: 3/14' });
+    expect(checkSummary('This talk covers -40 clusters.', numbers)).toEqual({ ok: false, reason: 'unsupported number: -40' });
+    expect(passesGuardrail('This talk covers a 10-20 node range.', numbers)).toBe(true);
+  });
 });

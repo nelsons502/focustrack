@@ -13,7 +13,7 @@ const SENTENCE_OPENERS = new Set([
 ]);
 
 const URL_PATTERN = /\b(?:https?:\/\/|www\.)[^\s<>"')]+/gi;
-const WORD_PATTERN = /\p{N}+(?:[.,:]\p{N}+)*%?|[\p{L}\p{N}]+/gu;
+const WORD_PATTERN = /(?<![\p{L}\p{N}])-?\p{N}+(?:[.,:/]\p{N}+)*%?|[\p{L}\p{N}]+/gu;
 const SENTENCE_BREAK = /(?<=[.!?]["'”’)\]]*)\s+/;
 
 function words(text: string): string[] {

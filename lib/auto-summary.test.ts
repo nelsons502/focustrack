@@ -38,28 +38,25 @@ describe('needsAutoSummary', () => {
 });
 
 describe('syncOperations', () => {
-  it('upserts by Sessionize ID with only schedule fields, so summaries are never sent or overwritten', () => {
-    const operations = syncOperations([session('7', { plainSummary: 'Reviewed.', summarySource: 'ai-reviewed', autoSummary: 'Auto.' })]);
+  it('sends only schedule fields, conditional on the version sync read, so summaries are never overwritten', () => {
+    const operations = syncOperations([session('7', { plainSummary: 'Reviewed.', summarySource: 'ai-reviewed', autoSummary: 'Auto.' })],
+      new Map([['7', { if_seq_no: 12, if_primary_term: 1 }]]));
     expect(operations).toHaveLength(2);
-    expect(operations[0]).toEqual({ update: { _index: 'sessions', _id: '7', retry_on_conflict: 3 } });
+    expect(operations[0]).toEqual({ update: { _index: 'sessions', _id: '7', if_seq_no: 12, if_primary_term: 1 } });
     const body = operations[1];
-    if (!('doc' in body)) throw new Error('expected an update body');
-    expect(body.doc_as_upsert).toBe(true);
-    expect(body.doc.id).toBe('7');
+    if (!('doc' in body)) throw new Error('expected a partial update body');
+    expect(body).not.toHaveProperty('doc_as_upsert');
     expect(body.doc.title).toBe('Talk 7');
     for (const field of ['plainSummary', 'summarySource', 'autoSummary', 'autoSummaryAt', 'autoSummaryModel', 'descriptionHash']) {
       expect(body.doc).not.toHaveProperty(field);
     }
   });
-});
 
-describe('syncOperations concurrency', () => {
-  it('makes updates to existing documents conditional on the version sync read', () => {
-    const operations = syncOperations([session('7'), session('8')], new Map([['7', { if_seq_no: 12, if_primary_term: 1 }]]));
-    expect(operations[0]).toEqual({ update: { _index: 'sessions', _id: '7', if_seq_no: 12, if_primary_term: 1 } });
-    expect(operations[1]).toMatchObject({ doc_as_upsert: false });
-    expect(operations[2]).toEqual({ update: { _index: 'sessions', _id: '8', retry_on_conflict: 3 } });
-    expect(operations[3]).toMatchObject({ doc_as_upsert: true });
+  it('creates unseen IDs with a create-only operation that cannot overwrite', () => {
+    const operations = syncOperations([session('8')]);
+    expect(operations[0]).toEqual({ create: { _index: 'sessions', _id: '8' } });
+    expect(operations[1]).toMatchObject({ id: '8', title: 'Talk 8' });
+    expect(operations[1]).not.toHaveProperty('plainSummary');
   });
 });
 
