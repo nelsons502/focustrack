@@ -1,0 +1,72 @@
+import type { Session, SessionKind } from './contract.ts';
+
+const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const unescape = (value: string) => value.replace(/\\([\\[\]()*_`])/g, '$1');
+
+function timestamp(day: string, clock: string): string {
+  const match = /^(\d{1,2}):(\d{2}) ([ap]m)$/i.exec(clock);
+  if (!match || +match[1] < 1 || +match[1] > 12 || +match[2] > 59) throw new Error('Invalid session time');
+  const hour = +match[1] % 12 + (match[3].toLowerCase() === 'pm' ? 12 : 0);
+  return `${day}T${String(hour).padStart(2, '0')}:${match[2]}:00-07:00`;
+}
+
+function classify(title: string, room: string, day: string): SessionKind {
+  const plain = title.replace(/^[^\p{L}\p{N}]+/u, '');
+  if (/^(registration\s*\+|coat\s*\+\s*bag check|coffee break\b|lunch(?:\s*\||$)|breakfast(?:\s*\||$))/i.test(plain)) return 'logistics';
+  if (/keynote/i.test(title) || /\| Hall DE$/i.test(room)) return 'keynote';
+  if (day < '2026-11-10' && /summit|hosted by|day with|separate registration|full day event|half day event/i.test(title)) return 'colocated';
+  if (/separate registration|all access pass/i.test(title)) return 'colocated';
+  if (/community gathering|network nook|peer group mentoring|meetup|meet \+ greet|\bBoF\b|contribfest|showcase|pavilion|in-booth|demo theater|documentary/i.test(title)) return 'community';
+  return 'talk';
+}
+
+function section(markdown: string, heading: string): string {
+  return markdown.replace(/\r/g, '').split(/^## /m)
+    .find(part => part.startsWith(`${heading}\n`))?.slice(heading.length).trim() ?? '';
+}
+
+export function parseSessionize(markdown: string, details: Record<string, string> = {}): Session[] {
+  const sessions: Session[] = [];
+  const lines = markdown.replace(/\r/g, '').split('\n');
+  let day = '';
+  for (let i = 0; i < lines.length; i++) {
+    const heading = /^### \w+, (\w+) (\d{1,2}), (\d{4})$/.exec(lines[i]);
+    if (heading) {
+      const month = months.indexOf(heading[1]) + 1;
+      if (!month) throw new Error('Invalid schedule date');
+      day = `${heading[3]}-${String(month).padStart(2, '0')}-${heading[2].padStart(2, '0')}`;
+    }
+    const link = /^- \[(.*)\]\((https:\/\/sessionize\.com\/api\/v2\/[^/]+\/view\/markdown\/session\/(\d+))\)$/.exec(lines[i]);
+    if (!link) continue;
+    const [, rawTitle, sourceUrl, id] = link;
+    const metadata = /^(?:(.*?) · )?(\d{1,2}:\d{2} [ap]m) - (\d{1,2}:\d{2} [ap]m) · (.+)$/i.exec((lines[i + 1] ?? '').trim());
+    if (!day || !metadata) throw new Error(`Invalid metadata for session ${id}`);
+    const [, names, start, end, room] = metadata;
+    const title = unescape(rawTitle);
+    const kind = classify(title, room, day);
+    if (kind === 'logistics') continue;
+    const roomParts = room.split(' | ');
+    const venue = roomParts.length > 1 ? roomParts[0] : null;
+    const level = roomParts.find(part => /^Level\s/i.test(part)) ?? null;
+    const restrictions: Session['restrictions'] = [];
+    if (/sold out/i.test(title)) restrictions.push('sold-out');
+    if (/separate registration/i.test(title)) restrictions.push('separate-registration');
+    if (/all access pass/i.test(title)) restrictions.push('all-access-pass');
+    const detail = details[id] ?? '';
+    const speakerSection = section(detail, 'Speakers') || section(detail, 'Speaker');
+    const speakers = [...speakerSection.matchAll(/^- \[(.*?)\]\([^\n]+?\)(?: — (.*))?$/gm)].map(match => ({
+      name: unescape(match[1]), company: unescape(match[2] ?? ''),
+    }));
+    const ballroom = /ballroom/i.test(room);
+    const breakout = venue === 'Salt Palace' && level !== null && /^(?:\d{3}\b|Grand Ballroom)/i.test(roomParts[2] ?? '');
+    sessions.push({
+      id, eventId: 'kccncna2026', title, description: section(detail, 'Description'),
+      speakers: speakers.length ? speakers : names ? names.split(', ').map(name => ({name: unescape(name), company: ''})) : [],
+      startsAt: timestamp(day, start), endsAt: timestamp(day, end), day, room, venue, level, kind, restrictions,
+      crowdEstimate: kind === 'keynote' || ballroom ? 'large' : 'unknown',
+      crowdBasis: kind === 'keynote' ? 'keynote room' : ballroom ? 'ballroom' : 'unknown',
+      captions: breakout ? 'wordly-breakout' : 'unknown', sourceUrl,
+    });
+  }
+  return sessions;
+}
