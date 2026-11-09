@@ -24,11 +24,13 @@ export default function AppNav() {
     closeRef.current?.focus();
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const background = document.querySelectorAll<HTMLElement>(".app-content, .demo-bar");
+    const background = document.querySelectorAll<HTMLElement>(".app-content, .demo-bar, .app-nav-bar, .skip-link");
     background.forEach((element) => element.setAttribute("inert", ""));
     const query = window.matchMedia("(min-width: 900px)");
     const onWide = (event: MediaQueryListEvent) => {
       if (event.matches) {
+        const destination = panelRef.current?.querySelector<HTMLElement>('[aria-current="page"]') ?? panelRef.current?.querySelector<HTMLElement>("a[href]");
+        destination?.focus();
         setOpen(false);
       }
     };
@@ -96,6 +98,9 @@ export default function AppNav() {
         id={panelId}
         ref={panelRef}
         className="app-nav-panel"
+        role={open ? "dialog" : undefined}
+        aria-modal={open ? true : undefined}
+        aria-label={open ? "Navigation" : undefined}
         onKeyDown={onPanelKeyDown}
         onClick={onPanelClick}
       >

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AppNav from "./AppNav";
 
@@ -84,4 +84,24 @@ describe("AppNav", () => {
     expect(screen.getByRole("link", { name: "Now" })).toHaveAttribute("href", `/now?now=${encoded}`);
     expect(screen.getByRole("link", { name: /Settings/ })).toHaveAttribute("href", `/settings?now=${encoded}`);
   });
+});
+
+it("moves focus to visible navigation when an open mobile menu becomes wide", () => {
+  let onWide: ((event: MediaQueryListEvent) => void) | undefined;
+  vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
+    matches: false, media: query, onchange: null,
+    addEventListener: vi.fn((_type: string, listener: EventListenerOrEventListenerObject) => { onWide = listener as (event: MediaQueryListEvent) => void; }),
+    removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(),
+  }));
+  render(<AppNav />);
+  fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+  expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
+  act(() => onWide?.({ matches: true } as MediaQueryListEvent));
+  expect(screen.getByRole("link", { name: "Plan" })).toHaveFocus();
+});
+
+it("exposes the full-screen menu as a named modal dialog", () => {
+  render(<AppNav />);
+  fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+  expect(screen.getByRole("dialog", { name: "Navigation" })).toHaveAttribute("aria-modal", "true");
 });
