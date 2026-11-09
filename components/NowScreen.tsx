@@ -73,6 +73,8 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   const requested = useRef(new Set<string>());
   const [announcement, setAnnouncement] = useState("");
   const [notesOpen, setNotesOpen] = useState(false);
+  const [notesSession, setNotesSession] = useState<Session | null>(null);
+  const [lastSavedFor, setLastSavedFor] = useState<string | null>(null);
   const [draft, setDraft] = useState({ text: "", sessionId: "" });
   const [skipped, setSkipped] = useState<Session | null>(null);
   const [retryToken, setRetryToken] = useState(0);
@@ -147,8 +149,11 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   });
 
   const findHref = withNowParam("/", nowParam);
-  const currentNotes = current ? (localState.notes[current.id] ?? []) : [];
-  const recentNotes = currentNotes.slice(-NOTES_SHOWN).reverse();
+  const noteTarget = notesOpen && notesSession ? notesSession : current;
+  const targetNotes = noteTarget ? (localState.notes[noteTarget.id] ?? []) : [];
+  const recentNotes = targetNotes.slice(-NOTES_SHOWN).reverse();
+  const canUndoNote =
+    lastSavedFor !== null && (localState.notes[lastSavedFor]?.length ?? 0) > 0;
 
   function saveDraft(): boolean | null {
     if (!draft.sessionId || !draft.text.trim()) return null;
@@ -156,6 +161,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
       addNote(getLocalStateSnapshot(), draft.sessionId, draft.text, new Date()),
     );
     setDraft({ text: "", sessionId: "" });
+    setLastSavedFor(draft.sessionId);
     setAnnouncement(
       saved
         ? "Note saved on this device."
@@ -181,8 +187,9 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   }
 
   function handleUndoNote() {
-    if (!current) return;
-    updateLocalState(undoLastNote(getLocalStateSnapshot(), current.id));
+    if (!lastSavedFor) return;
+    updateLocalState(undoLastNote(getLocalStateSnapshot(), lastSavedFor));
+    setLastSavedFor(null);
     setAnnouncement("Last note removed.");
     noteInputRef.current?.focus();
   }
@@ -338,7 +345,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
           </section>
         ) : null}
 
-        {ready && !loadError && current ? (
+        {ready && !loadError && noteTarget ? (
           <section className="now-notes" aria-label="Quick notes">
             <button
               ref={toggleRef}
@@ -346,7 +353,14 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
               className="now-button now-toggle"
               aria-expanded={notesOpen}
               aria-controls="now-notes-drawer"
-              onClick={() => (notesOpen ? closeNotes() : setNotesOpen(true))}
+              onClick={() => {
+                if (notesOpen) {
+                  closeNotes();
+                } else {
+                  setNotesSession(current);
+                  setNotesOpen(true);
+                }
+              }}
             >
               {notesOpen ? "Close notes" : "Quick notes"}
             </button>
@@ -355,7 +369,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
                 id="now-notes-drawer"
                 className="now-drawer"
                 role="group"
-                aria-label={`Notes for ${current.title}`}
+                aria-label={`Notes for ${noteTarget.title}`}
                 onKeyDown={handleNotesKey}
               >
                 <form onSubmit={handleSaveNote} className="now-note-form">
@@ -372,7 +386,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
                       onChange={(event) =>
                         setDraft((previousDraft) => ({
                           text: event.target.value,
-                          sessionId: previousDraft.sessionId || current.id,
+                          sessionId: previousDraft.sessionId || noteTarget.id,
                         }))
                       }
                     />
@@ -386,7 +400,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
                     type="button"
                     className="now-button"
                     onClick={handleUndoNote}
-                    disabled={currentNotes.length === 0}
+                    disabled={!canUndoNote}
                   >
                     Undo last note
                   </button>

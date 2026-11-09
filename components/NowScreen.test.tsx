@@ -181,4 +181,39 @@ describe("NowScreen", () => {
     expect(await screen.findByText(/level changes from Level 2 to Level 3/)).toBeInTheDocument();
     expect(screen.queryByText("Happening now")).not.toBeInTheDocument();
   });
+
+  it("keeps the drawer and draft when the talk ends mid-typing, then saves to that talk", async () => {
+    seedPlan(["cur"]);
+    mockSessions([current]);
+    const view = render(<NowScreen nowParam="2026-11-10T11:25-07:00" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
+    fireEvent.change(screen.getByLabelText(/One line/), { target: { value: "last thought" } });
+    view.rerender(<NowScreen nowParam="2026-11-10T11:35-07:00" />);
+    expect(screen.queryByText("Happening now")).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Notes for Session cur" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/One line/)).toHaveValue("last thought");
+    fireEvent.click(screen.getByRole("button", { name: "Close notes" }));
+    expect(getLocalStateSnapshot().notes.cur.map((n) => n.text)).toEqual(["last thought"]);
+    expect(screen.queryByRole("button", { name: "Quick notes" })).not.toBeInTheDocument();
+  });
+
+  it("undoes the note that was saved, not one on the new current session", async () => {
+    const a = makeSession("a", "10:30", "11:30");
+    const b = makeSession("b", "11:30", "12:30");
+    const state = createDefaultLocalState();
+    state.plan.sessionIds = ["a", "b"];
+    state.notes.b = [{ text: "b note", at: "2026-11-10T18:31:00.000Z" }];
+    updateLocalState(state);
+    mockSessions([a, b]);
+    const view = render(<NowScreen nowParam="2026-11-10T11:25-07:00" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
+    fireEvent.change(screen.getByLabelText(/One line/), { target: { value: "a note" } });
+    view.rerender(<NowScreen nowParam="2026-11-10T11:31-07:00" />);
+    expect(screen.getByRole("group", { name: "Notes for Session a" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
+    expect(getLocalStateSnapshot().notes.a.map((n) => n.text)).toEqual(["a note"]);
+    fireEvent.click(screen.getByRole("button", { name: "Undo last note" }));
+    expect(getLocalStateSnapshot().notes.a).toEqual([]);
+    expect(getLocalStateSnapshot().notes.b.map((n) => n.text)).toEqual(["b note"]);
+  });
 });
