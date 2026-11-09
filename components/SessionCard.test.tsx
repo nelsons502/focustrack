@@ -152,3 +152,23 @@ describe("SessionCard interactions", () => {
     );
   });
 });
+
+describe("SessionCard summaries", () => {
+  it("prefers the reviewed summary and labels it", () => {
+    renderCard(makeSession({ plainSummary: "A reviewed summary.", autoSummary: "This talk covers Kubernetes basics." }));
+    expect(screen.getByText("Plain-language summary (reviewed):")).toBeInTheDocument();
+    expect(screen.queryByText(/AI summary \(automatic, not reviewed\)/)).not.toBeInTheDocument();
+  });
+
+  it("labels a passing automatic summary as not reviewed", () => {
+    renderCard(makeSession({ autoSummary: "This talk covers Kubernetes basics." }));
+    expect(screen.getByText("AI summary (automatic, not reviewed):")).toBeInTheDocument();
+    expect(screen.getByText(/This talk covers Kubernetes basics\./)).toBeInTheDocument();
+  });
+
+  it("shows nothing when the automatic summary fails the guardrail", () => {
+    renderCard(makeSession({ autoSummary: "This talk is run by Zorblax engineers." }));
+    expect(screen.queryByText(/AI summary/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Zorblax/)).not.toBeInTheDocument();
+  });
+});

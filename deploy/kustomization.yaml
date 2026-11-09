@@ -6,6 +6,7 @@ resources:
   - pdb.yaml
   - service.yaml
   - httproute.yaml
+  - sync-cronjob.yaml
 # The image workflow owns this tag after the initial build.
 images:
   - name: app

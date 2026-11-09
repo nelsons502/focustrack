@@ -38,13 +38,23 @@ async function upsert(client: Client, sessions: Session[]): Promise<void> {
   }
 }
 
-async function summarize(client: Client, ids: string[]): Promise<number> {
+export function isMissingPipeline(error: unknown): boolean {
+  return error instanceof Error && /pipeline with id \[[^\]]+\] does not exist/i.test(error.message);
+}
+
+async function summarize(client: Client, ids: string[]): Promise<number | 'skipped'> {
   let failures = 0;
   for (let offset = 0; offset < ids.length; offset += 10) {
-    const result = await client.updateByQuery({
-      index: INDEX_NAME, pipeline: AUTO_SUMMARY_PIPELINE, refresh: true, conflicts: 'proceed',
-      query: { ids: { values: ids.slice(offset, offset + 10) } },
-    });
+    let result;
+    try {
+      result = await client.updateByQuery({
+        index: INDEX_NAME, pipeline: AUTO_SUMMARY_PIPELINE, refresh: true, conflicts: 'proceed',
+        query: { ids: { values: ids.slice(offset, offset + 10) } },
+      });
+    } catch (error) {
+      if (offset === 0 && isMissingPipeline(error)) return 'skipped';
+      throw error;
+    }
     failures += result.failures?.length ?? 0;
     console.log(`Summarize pass ${Math.min(offset + 10, ids.length)}/${ids.length}`);
   }
@@ -69,6 +79,10 @@ export async function main(): Promise<void> {
     if (options.dryRun) { console.log('Dry run: nothing was written.'); return; }
     if (changed.length) await upsert(client, changed);
     const failures = candidates.length ? await summarize(client, candidates.map(session => session.id)) : 0;
+    if (failures === 'skipped') {
+      console.log(`Sync done: fetched ${sessions.length}, changed ${changed.length}; summaries skipped because pipeline ${AUTO_SUMMARY_PIPELINE} is not set up (run npm run setup-auto-summary). Nothing was deleted.`);
+      return;
+    }
     let summarized = 0;
     let rejected = 0;
     if (candidates.length) {
