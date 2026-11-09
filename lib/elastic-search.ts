@@ -137,9 +137,7 @@ export async function searchSessions(params: URLSearchParams): Promise<SearchRes
   const filter: estypes.QueryDslQueryContainer[] = [];
   if (day !== null) filter.push({ term: { day } });
   if (excludeRestricted === "true") {
-    filter.push({ bool: { must_not: [{ terms: { restrictions: [
-      "sold-out", "separate-registration", "all-access-pass",
-    ] } }] } });
+    filter.push({ bool: { must_not: [{ terms: { restrictions: [...RESTRICTIONS] } }] } });
   }
   const lexical: estypes.QueryDslQueryContainer = q
     ? { multi_match: { query: q, fields: ["title^2", "description"] } }
