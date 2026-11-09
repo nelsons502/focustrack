@@ -740,3 +740,19 @@ body:has(.now-page) {
   margin: 0.5rem 0 0;
   font-weight: 600;
 }
+
+.now-page .app-name {
+  color: var(--now-muted);
+}
+
+.now-page .nav-link {
+  border-color: var(--now-border);
+  background: var(--now-surface);
+  color: var(--now-accent);
+}
+
+.now-page .nav-link:hover,
+.now-page .nav-link-current {
+  background: #1d2430;
+  border-color: var(--now-accent);
+}

@@ -1,0 +1,199 @@
+{
+  "kind": "Dashboard",
+  "metadata": {
+    "dash0Extensions": {
+      "dataset": "default",
+      "id": "focustrack-search-default"
+    },
+    "name": "focustrack-search"
+  },
+  "spec": {
+    "display": {
+      "description": "Backend Elastic-operation signals only (otel_scope_name=focustrack-elastic, elastic_operation=search). NOT full HTTP/browser latency. Custom metrics currently require the service identity fix rollout; pre-fix window data is unreliable. See docs/observability.md.",
+      "name": "FocusTrack Search"
+    },
+    "duration": "1h",
+    "layouts": [
+      {
+        "kind": "Grid",
+        "spec": {
+          "items": [
+            {
+              "content": {
+                "$ref": "#/spec/panels/latency"
+              },
+              "height": 8,
+              "width": 12,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/throughput"
+              },
+              "height": 8,
+              "width": 12,
+              "x": 12,
+              "y": 0
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/errors"
+              },
+              "height": 8,
+              "width": 12,
+              "x": 0,
+              "y": 8
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/fallback"
+              },
+              "height": 8,
+              "width": 12,
+              "x": 12,
+              "y": 8
+            }
+          ]
+        }
+      }
+    ],
+    "panels": {
+      "errors": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "description": "outcome=error share of search operations. Missing error series becomes 0 ONLY when total traffic is positive (or vector(0) on numerator); no traffic renders empty, never false 100% success. No denominator clamping.",
+            "name": "Error percentage (%)"
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "percent"
+                },
+                "max": 100
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "minStep": "30s",
+                    "query": "(sum(rate({otel_metric_name=\"focustrack.elastic.operations\", elastic_operation=\"search\", otel_scope_name=\"focustrack-elastic\", instance!=\"\", outcome=\"error\"}[5m])) or vector(0)) / sum(rate({otel_metric_name=\"focustrack.elastic.operations\", elastic_operation=\"search\", otel_scope_name=\"focustrack-elastic\", instance!=\"\"}[5m])) * 100"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "fallback": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "description": "search_mode=lexical-fallback share of search operations. Missing fallback series becomes 0 ONLY when total traffic is positive (or vector(0) on numerator); no traffic renders empty. No denominator clamping.",
+            "name": "Lexical-fallback percentage (%)"
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "percent"
+                },
+                "max": 100
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "minStep": "30s",
+                    "query": "(sum(rate({otel_metric_name=\"focustrack.elastic.operations\", elastic_operation=\"search\", otel_scope_name=\"focustrack-elastic\", instance!=\"\", search_mode=\"lexical-fallback\"}[5m])) or vector(0)) / sum(rate({otel_metric_name=\"focustrack.elastic.operations\", elastic_operation=\"search\", otel_scope_name=\"focustrack-elastic\", instance!=\"\"}[5m])) * 100"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "latency": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "description": "p95 of focustrack.elastic.duration_ms for search operations only. Backend Elastic signal, not end-to-end HTTP/browser latency. Dots in metric name preserved via otel_metric_name selector. No service_name matcher: Prometheus mapping emits job=focustrack for custom metrics.",
+            "name": "Backend Elastic p95 latency (ms, target < 800)"
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "milliseconds"
+                }
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "minStep": "30s",
+                    "query": "histogram_quantile(0.95, sum(rate({otel_metric_name=\"focustrack.elastic.duration_ms\", elastic_operation=\"search\", otel_scope_name=\"focustrack-elastic\", instance!=\"\"}[5m])))"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "throughput": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "description": "Rate of focustrack.elastic.operations with elastic_operation=search. Backend operation throughput, not HTTP request rate.",
+            "name": "Search operations / sec"
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "decimal"
+                }
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "minStep": "30s",
+                    "query": "sum(rate({otel_metric_name=\"focustrack.elastic.operations\", elastic_operation=\"search\", otel_scope_name=\"focustrack-elastic\", instance!=\"\"}[5m]))"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "refreshInterval": "30s"
+  }
+}

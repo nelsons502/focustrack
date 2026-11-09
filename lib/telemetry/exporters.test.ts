@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { context, metrics, ROOT_CONTEXT, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import type { Context, ContextManager } from "@opentelemetry/api";
@@ -21,6 +23,7 @@ import {
   SafeLogExporter,
   SafeMetricExporter,
   SafeSpanExporter,
+  safeResource,
   sanitizeLogRecordForExport,
   sanitizeResourceMetricsForExport,
   sanitizeSpanForExport,
@@ -98,6 +101,41 @@ function fakeSpan(overrides: Partial<ReadableSpan> = {}): ReadableSpan {
     ...overrides,
   } as ReadableSpan;
 }
+
+describe("process-owned export resource identity", () => {
+  const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+  it("reuses our UUID across resource sanitization and module reloads, replacing upstream identifiers", async () => {
+    const first = safeResource(fakeResource()).attributes["service.instance.id"];
+    expect(first).toMatch(uuidV4);
+    for (const untrusted of ["private-pod-hostname", "11111111-1111-4111-8111-111111111111"]) {
+      const safe = safeResource(fakeResource({ "service.name": "private-user", "service.instance.id": untrusted }));
+      expect(safe.attributes["service.instance.id"]).toBe(first);
+      expect(safe.attributes["service.name"]).toBe("focustrack");
+      expect(JSON.stringify(safe.attributes)).not.toContain(untrusted);
+    }
+    vi.resetModules();
+    const reloaded = await import("./exporters");
+    expect(reloaded.safeResource(fakeResource()).attributes["service.instance.id"]).toBe(first);
+  });
+
+  it("gives independent Node processes distinct writer identities, stable across module copies", () => {
+    const resourceUrl = pathToFileURL(`${process.cwd()}/lib/telemetry/resource.ts`).href;
+    const script = `
+      const a = await import(${JSON.stringify(resourceUrl + "?a")});
+      const b = await import(${JSON.stringify(resourceUrl + "?b")});
+      console.log(JSON.stringify([a.processInstanceId(), b.processInstanceId()]));
+    `;
+    const run = () => JSON.parse(execFileSync(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", script], { encoding: "utf8" })) as string[];
+    const first = run();
+    const second = run();
+    expect(first[0]).toMatch(uuidV4);
+    expect(second[0]).toMatch(uuidV4);
+    expect(first[1]).toBe(first[0]);
+    expect(second[1]).toBe(second[0]);
+    expect(second[0]).not.toBe(first[0]);
+  });
+});
 
 describe("signal exporter URLs", () => {
   it("derives traces, metrics and logs URLs from a base endpoint", () => {
@@ -350,7 +388,7 @@ describe("sanitizeResourceMetricsForExport (privacy regression)", () => {
     expect(safe.scopeMetrics[0]?.metrics[0]?.descriptor).toEqual({
       name: "focustrack.elastic.duration_ms",
       description: "",
-      unit: "",
+      unit: "ms",
       valueType: 1,
     });
     const point = safe.scopeMetrics[0]?.metrics[0]?.dataPoints[0] as unknown as Record<string, unknown>;
@@ -372,6 +410,7 @@ describe("sanitizeResourceMetricsForExport (privacy regression)", () => {
     exporter.export(fakeMetrics(), vi.fn());
     const exported = delegate.export.mock.calls[0]?.[0] as ResourceMetrics;
     expect(exported.scopeMetrics).toHaveLength(1);
+    expect(exported.scopeMetrics[0]?.metrics[0]?.descriptor.unit).toBe("{operation}");
     expect(JSON.stringify(exported)).not.toContain(SECRET_QUERY);
   });
 });
@@ -628,6 +667,11 @@ describe("real SDK providers through the safe exporters", () => {
     const allMetrics = exportedMetrics.flatMap((rm) => rm.scopeMetrics.flatMap((sm) => sm.metrics));
     const counter = allMetrics.find((m) => m.descriptor.name === "focustrack.elastic.operations");
     const histogram = allMetrics.find((m) => m.descriptor.name === "focustrack.elastic.duration_ms");
+    expect(counter?.descriptor.unit).toBe("{operation}");
+    expect(histogram?.descriptor.unit).toBe("ms");
+    const writer = exportedMetrics[0]?.resource.attributes["service.instance.id"];
+    expect(writer).toMatch(/^[0-9a-f-]{36}$/);
+    expect(spans[0]?.resource.attributes["service.instance.id"]).toBe(writer);
     expect(counter?.dataPoints[0]?.value).toBe(1);
     expect(counter?.dataPoints[0]?.attributes).toEqual({
       "elastic.operation": "search",
@@ -639,6 +683,7 @@ describe("real SDK providers through the safe exporters", () => {
 
     const records = logExporter.getFinishedLogRecords();
     expect(records).toHaveLength(1);
+    expect(records[0]?.resource.attributes["service.instance.id"]).toBe(writer);
     expect(records[0]?.body).toBe("elastic_operation_completed");
     expect(records[0]?.attributes).toMatchObject({ "elastic.operation": "search", "search.took_ms": 12 });
     expect(records[0]?.spanContext?.traceId).toBe(spans[0]?.spanContext().traceId);

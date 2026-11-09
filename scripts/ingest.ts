@@ -9,7 +9,7 @@ import { loadSummaries, mergeSummaries } from '../lib/summaries.ts';
 import { initNodeTelemetry } from '../lib/telemetry/node-cli.ts';
 import { traceElasticOperation } from '../lib/telemetry/trace-elastic.ts';
 
-const source = 'https://sessionize.com/api/v2/uo948i5p/view/markdown';
+export const source = 'https://sessionize.com/api/v2/uo948i5p/view/markdown';
 
 function markdownError(markdown: string, relativeFile: string, url: string): string | undefined {
   const normalized = markdown.replace(/\r/g, '');
@@ -43,12 +43,12 @@ export function parseOptions(args: string[]): {day?: string; recreate: boolean} 
   return options;
 }
 
-export function createMarkdownFetcher(cacheDirectory = '.cache') {
+export function createMarkdownFetcher(cacheDirectory = '.cache', alwaysFetch: ReadonlySet<string> = new Set()) {
   let lastRequestAt = 0;
   return async (relativeFile: string, url: string): Promise<string> => {
     const file = join(cacheDirectory, relativeFile);
     let cached: string | undefined;
-    try { cached = await readFile(file, 'utf8'); }
+    try { if (!alwaysFetch.has(relativeFile)) cached = await readFile(file, 'utf8'); }
     catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error; }
     if (cached !== undefined && !markdownError(cached, relativeFile, url)) return cached;
     await sleep(Math.max(0, 1000 - (Date.now() - lastRequestAt)));

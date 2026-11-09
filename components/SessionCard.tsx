@@ -8,6 +8,7 @@ import {
   ACCESSIBILITY_SOURCE_URL,
 } from "../lib/event";
 import { formatEventRange } from "../lib/client/time";
+import { passesGuardrail } from "../lib/summary-guardrail";
 
 const RESTRICTION_LABELS: Record<Restriction, string> = {
   "sold-out": "Sold out",
@@ -106,6 +107,17 @@ export default function SessionCard({
                 : speaker.name,
             )
             .join(", ")}
+        </p>
+      ) : null}
+      {session.plainSummary?.trim() ? (
+        <p className="card-summary">
+          <strong>AI summary (reviewed):</strong>{" "}
+          {session.plainSummary.trim()}
+        </p>
+      ) : passesGuardrail(session.autoSummary, session) ? (
+        <p className="card-summary">
+          <strong>AI summary (automatic, not reviewed):</strong>{" "}
+          {session.autoSummary}
         </p>
       ) : null}
       {description ? (
