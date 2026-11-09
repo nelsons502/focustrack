@@ -1,45 +1,115 @@
 # FocusTrack
 
-FocusTrack helps conference attendees take in fewer talks, and take them in well: search the real schedule, check the day's energy load, and stay present in the room.
+A focus-friendly conference companion: find the right talk, plan a day you can actually absorb, and stay present in the room.
 
-Built for the WeMakeDevs Cloud Native Hackathon (Salt Lake City, November 9, 2026).
+- Live: https://focustrack.cnh.radarhq.io
+- Demo: https://focustrack.cnh.radarhq.io/?now=2026-11-10T11:15-07:00
 
-## Setup
+The real talks happen November 10-12, 2026 (KubeCon + CloudNativeCon North America, Salt Lake City). The `?now=` parameter pins a visible "Demo time" banner so the demo reads as Tuesday 11:15 MT. Remove the parameter to return to the live clock.
 
-Requires Node 22.
+Built for the WeMakeDevs Cloud Native Hackathon.
 
-```bash
-npm ci
-npm run dev
+## The problem
+
+A big conference packs hundreds of sessions into a few days. For autistic, anxious, ADHD, and Deaf or hard-of-hearing attendees, that volume is more than a scheduling nuisance: back-to-back sessions, crowded rooms, long walks between buildings, and noisy halls drain energy fast, and a missed accommodation can mean missing the talk entirely. Most schedule tools help you add more sessions. FocusTrack helps you pick fewer, take them in well, and leave the room when you need to.
+
+## What it does
+
+| Area | Status | What you get |
+| --- | --- | --- |
+| Find (`/`) | Live | Hybrid search (keyword plus semantic) over the real KubeCon NA 2026 schedule. Filter by day and hide restricted sessions (sold out, separate registration, all-access pass). Results show event-time schedule, room, speakers, and type. |
+| Plan (`/plan`) | Live | Saved sessions as a timeline for the day you choose. An energy check, run on your device, flags too many sessions in a row, tight transitions (room, level, and building changes), long days, and loud rooms, with thresholds you can adjust. It can suggest dropping a session or saving a quiet-room break (Salt Palace, Level 2, 260A) in a real gap. |
+| Be present (`/now`) | Live | A calm Now screen: the session you are in, what is next, and a transition note, with on-device notes and "not attending". |
+| Plain-language summaries | Data on main; in-app display pending | Reviewed AI-written summaries for the demo sessions are in `data/summaries.json`, but the app does not display them yet. Broader autonomous summarising is in progress. |
+| Calendar export | On main ([PR #11](https://github.com/nelsons502/focustrack/pull/11)) | Download your sessions and quiet breaks as a calendar file; FocusTrack adds no alarms. |
+| Remember (`/reflect`) | On main ([PR #12](https://github.com/nelsons502/focustrack/pull/12)) | Optional, ungraded reflection on completed planned talks, with device-local answers and a night-of recap. |
+
+Plans, notes, and settings are saved on your device. Plan, Now, calendar export and reflection use saved public session IDs to look up schedule details. Notes, breaks, settings and reflection answers are never sent.
+
+Honest accessibility data runs through all of it. Crowd and noise appear only as labelled estimates with their basis, or as "unknown", and never as "small" or "quiet". Caption and quiet-room information comes from the official accessibility page. If semantic search is unavailable, the API falls back to keyword search and the UI says so.
+
+## Demo flow
+
+1. Open the demo link above and search for a topic; save two or more sessions.
+2. Open Plan, choose the event day, and review any overlap or energy warnings. A quiet-room break is offered when a real gap fits.
+3. Open Now with the demo clock preserved, capture a note, then close the app. Export the plan from Find to let your own calendar handle reminders.
+4. After a planned talk has ended, open Remember for an optional reflection and recap. With the real clock before the conference, an empty state is expected.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  S[Sessionize schedule] -->|npm run ingest| E[(Elastic Serverless<br/>sessions index)]
+  B[Browser] --> N[Next.js on Kubernetes]
+  G[GitHub main] -->|Argo CD| N
+  N -->|BM25 + semantic_text, fused by RRF| E
+  B -.->|plan and notes stay on device| L[(localStorage)]
+  N -.->|OpenTelemetry| D[Dash0]
 ```
 
-Environment variables (server only, never committed):
+Key decisions:
 
-- `ES_URL`: Elasticsearch endpoint
-- `ES_API_KEY`: Elasticsearch API key
+- **Elastic is the only schedule store.** The `sessions` index holds the schedule's sessions (routine logistics such as registration and meals are dropped at ingest). Search, filters, and agenda lookups are Elasticsearch queries, not in-memory filtering.
+- **RRF instead of score blending.** Keyword (BM25) and `semantic_text` scores are on different scales. Reciprocal rank fusion merges the two ranked lists without tuning weights, and filters are applied inside both sub-queries.
+- **Personal data stays on the device.** Plan, notes, breaks, and settings live in `localStorage` (`focustrack:v1`). Selected public session IDs are sent to the schedule lookup API to retrieve times and rooms; notes, settings, breaks and reflection answers are not sent.
+- **Estimates never claim "quiet".** Crowd is derived from room type and noise from the exhibit hall; a wrong reassurance harms noise-sensitive attendees, so everything else is "unknown". The rules are in `lib/contract.ts`.
+- **GitOps on Radar and Argo CD.** A push to `main` that changes code builds an image, updates `deploy/kustomization.yaml`, and Argo CD syncs the cluster. See [`docs/radar.md`](docs/radar.md).
+- **AI only ahead of time, apart from search.** Elastic's built-in inference embeds descriptions at ingest and the query at search time; no generative model runs in the app, and summaries are generated beforehand and reviewed (display pending).
 
-Checks run in CI: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`.
+## Sponsor tools and how we used them
 
-## Find (search)
+**Elastic.** Elastic Serverless (9.7.0) is the core data layer: a `sessions` index with an explicit mapping, a `semantic_text` field using built-in inference, and an RRF retriever that fuses a BM25 `multi_match` with a semantic query. See [`lib/elastic.ts`](lib/elastic.ts) and [`lib/elastic-search.ts`](lib/elastic-search.ts). The `/readyz` probe also checks that Elastic is reachable.
 
-The home page searches the live schedule through `GET /api/search`. Type a topic or learning goal, pick a day (Tuesday, November 10, 2026 by default), optionally hide restricted sessions (sold out, separate registration or all-access pass), and press Search. Search matches session titles and descriptions, with AI-assisted semantic matching over descriptions. Leaving the box empty browses the schedule for the chosen day.
+**Gitar (Sonar).** Features land as separate pull requests, and Gitar reviewed and committed fixes (as gitar-bot) on PRs #3, #4, #5, and #8. Project-aware review rules live in [`.gitar/review/conventions.md`](.gitar/review/conventions.md) (strict TypeScript, event time zones, Elastic as the data layer, RRF) and [`.gitar/review/product-principles.md`](.gitar/review/product-principles.md) (focus-first, accessibility, honest data, privacy). Gitar review findings, automatic code corrections and CI outcomes are visible on the [pull requests](https://github.com/nelsons502/focustrack/pulls?q=is%3Apr).
 
-Each result shows the session time in event time (America/Denver, whatever your device clock says), room, speakers, session type and any ticket restrictions. Crowd and noise are shown only as labelled estimates with their basis, or as "unknown". Wordly captions are mentioned only where the data says they apply, with a link to the official accessibility page.
+**Radar.** The app runs on Kubernetes in the team namespace, deployed by Argo CD from [`argocd/application.yaml`](argocd/application.yaml) and [`deploy/`](deploy/), with a GitHub Actions image workflow ([`.github/workflows/image.yml`](.github/workflows/image.yml)). Setup, probes, and the release flow are documented in [`docs/radar.md`](docs/radar.md). A [Radar AI investigation](https://app.radarhq.io/c/uRdEIEL90Yk/investigations/chat_ie6DbFJiQMGlhJN_?org=org_NCJbssDGEBsU) of the running app was an all-clear that recommended a PodDisruptionBudget, which PR #15 added ([`deploy/pdb.yaml`](deploy/pdb.yaml)). Radar Checks went from 4 medium findings (12:56 MT) to 0 (13:58–14:04 MT) after hardening and separate orphan cleanup. Read-only verification found two ready replicas; before/after screenshot capture remains pending.
 
-"Add to plan" saves the session ID on your device (localStorage key `focustrack:v1`). On the Plan page, choose "Load saved sessions from schedule service" before the current set of session IDs is sent to look up their times and rooms. Adding a new session ID asks you again. Notes, quiet-room breaks and settings are not sent, and adding or removing a talk keeps any saved breaks.
+**Dash0.** Server-side OpenTelemetry (traces, metrics, logs) around Elastic calls is on main, exported through privacy-filtering exporters that never send queries, plans, or schedule text; see [`docs/observability.md`](docs/observability.md). Telemetry from a local run (trace, metrics, and a correlated log) was verified in Dash0. A deployed hybrid search on November 9 at 21:04 UTC also produced an `elastic.search` span, a completion log with matching mode and result count, and an operations metric update in Dash0. Browser monitoring and a dashboard/SLO remain pending.
 
-For demos, `?now=2026-11-10T11:15-07:00` pins a visible "Demo time" banner. Remove the parameter (or use the clear link) to return to the live clock. Unrecognised values are ignored.
+## Accessibility
 
-## Plan (agenda and energy check)
+Sourced facts come from the official [KubeCon + CloudNativeCon NA inclusion and accessibility page](https://events.linuxfoundation.org/kubecon-cloudnativecon-north-america/attend/inclusion-accessibility/): Wordly captions in breakout rooms (follow the instructions posted in each room), and quiet rooms at Salt Palace Level 2, 260A (all attendees) and 260B (women and nonbinary attendees), where conversation and work are discouraged.
 
-`/plan` shows your saved sessions as a timeline for a day you choose, in event time (America/Denver), with room, speakers and ticket restrictions. Saved IDs are looked up through `GET /api/sessions?ids=` in batches of at most 50; an empty plan makes no request. Saved entries that are no longer in the schedule are named honestly and can be removed.
+Design bar: 44 by 44 pixel touch targets, layouts that reflow at 320 pixels, visible keyboard focus, results announced through an `aria-live` region, `prefers-reduced-motion` respected, and no meaning conveyed by color alone. The target is WCAG 2.2 AA. Manual keyboard and VoiceOver testing is in progress.
 
-The energy check runs on this device for the chosen day only, against limits you can change (sessions in a row, what counts as a break, move times for room, level and building changes, session hours per day, and whether to flag rooms estimated to be loud). It explains each concern in concrete terms and can suggest dropping one session with one tap. When a real gap between saved sessions fits your shortest-break setting, it can suggest saving a quiet-room break (Salt Palace, Level 2, 260A) for that gap; the break is stored on this device with the rest of your plan (same `focustrack:v1` key), appears in the timeline, and can be removed with undo. Duplicate or overlapping breaks are refused. Settings are stored on this device too.
+## Run it locally
 
-## Data credit
+Prerequisites: Node 22 and an Elasticsearch 9 deployment with built-in inference (Elastic Serverless works).
 
-Schedule data: CNCF / Sessionize ([source](https://sessionize.com/api/v2/uo948i5p/view/markdown)). The repository does not contain raw schedule text.
+```bash
+export ES_URL="https://your-deployment.es.example.com"
+export ES_API_KEY="your-encoded-api-key"
+npm ci
+npm run ingest
+npm run dev
+npm test
+```
+
+- `ES_URL` and `ES_API_KEY` are server-side only and never committed. If the `sessions` index already exists, `npm run ingest -- --recreate` replaces it.
+- Ingest fetches the schedule from Sessionize at roughly one request per second, so the first run takes a while.
+- CI runs `npm run typecheck`, `npm run lint`, `npm test`, and `npm run build`.
+
+Deploying: Kubernetes through Argo CD (see [`docs/radar.md`](docs/radar.md)), or the Vercel fallback with `vercel deploy --prod`, with `ES_URL` and `ES_API_KEY` set in Vercel's environment settings.
+
+## Data and credit
+
+Schedule data: CNCF / Sessionize ([source](https://sessionize.com/api/v2/uo948i5p/view/markdown)). The repository holds no schedule data beyond short test-fixture excerpts; ingest fetches the schedule at runtime. Plain-language summaries in `data/summaries.json` are AI-written and reviewed; the ten reviewed summaries have been applied to the live index with `npm run apply-summaries`. Showing them in the app, with an AI label, is pending.
 
 ## AI disclosure
 
-AI coding assistants will be used during this hackathon. This section will describe how, per the event rules.
+Nelson Schnepf defined the problem, vision, data contract, architecture, and scope, and directs review and merge decisions. Coding agents apply scoped corrections and merge approved PRs under his authorization.
+
+AI coding agents wrote most of the code under that direction:
+
+- An orchestrator (Claude Code, Claude Opus).
+- A build manager (OpenAI Codex, GPT-6.1-Sol).
+- Workers and cross-model reviewers (Codex, Muse, and Claude Sonnet and Opus).
+- Gitar for pull request review, automatic code corrections, and CI analysis. Human review caught and corrected an automatic-close regression in the Now screen; a green bot approval alone was not treated as permission to merge.
+
+Every pull request had a reviewer from a different model family than its author.
+
+Runtime AI: Elastic's built-in inference powers semantic search. Plain-language summaries are generated ahead of time and checked. No generative model runs on the live demo path; the only model call at request time is Elastic embedding the search query.
+
+## License
+
+No project license has been selected yet.
