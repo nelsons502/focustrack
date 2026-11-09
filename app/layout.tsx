@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import DemoBar from "../components/demo/DemoBar";
-import PrimaryNav from "../components/plan/PrimaryNav";
-import SettingsLink from "../components/SettingsLink";
+import AppNav from "../components/nav/AppNav";
 import ThemeInit from "../components/settings/ThemeInit";
 import "./globals.css";
 
@@ -25,14 +24,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           Skip to main content
         </a>
         <ThemeInit />
-        <header className="site-header">
-          <div className="site-header-inner">
-            <p className="site-name">FocusTrack</p>
-            <PrimaryNav />
-            <SettingsLink />
-          </div>
-        </header>
-        {children}
+        <div className="app-shell">
+          <AppNav />
+          <div className="app-content">{children}</div>
+        </div>
         <DemoBar />
       </body>
     </html>
