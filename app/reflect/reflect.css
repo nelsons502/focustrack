@@ -4,10 +4,6 @@
   line-height: 1.25;
 }
 
-.reflect-heading:focus {
-  outline: none;
-}
-
 .reflect-intro,
 .reflect-meta {
   margin: 0 0 1rem;

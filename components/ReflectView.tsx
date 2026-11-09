@@ -70,6 +70,7 @@ export default function ReflectView() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [retry, setRetry] = useState(0);
+  const [tick, setTick] = useState(0);
   const [view, setView] = useState<View>({ kind: "list" });
   const headingRef = useRef<HTMLHeadingElement>(null);
   const idsKey = plannedIds(localState).join(",");
@@ -90,9 +91,17 @@ export default function ReflectView() {
   }, [idsKey, retry]);
 
   useEffect(() => {
+    if (demoNow) return;
+    const timer = window.setInterval(() => setTick((n) => n + 1), 60_000);
+    return () => window.clearInterval(timer);
+  }, [demoNow]);
+
+  useEffect(() => {
     headingRef.current?.focus();
   }, [view]);
 
+  // tick only exists to re-render each minute so newly ended talks appear
+  void tick;
   const now = demoNow ?? new Date();
   const ended = selectEndedToday(sessions, localState, now);
   const recap = savedReflections(ended, localState);
@@ -273,7 +282,10 @@ function ReflectForm({
                 name="prompt"
                 value={text}
                 checked={prompt === text}
-                onChange={() => setPrompt(text)}
+                onChange={() => {
+                  setPrompt(text);
+                  setMessage("");
+                }}
               />
               <span>{text}</span>
             </label>
@@ -287,7 +299,10 @@ function ReflectForm({
           className="reflect-answer"
           value={answer}
           maxLength={MAX_ANSWER_LENGTH}
-          onChange={(event) => setAnswer(event.target.value)}
+          onChange={(event) => {
+            setAnswer(event.target.value);
+            setMessage("");
+          }}
         />
         <div className="reflect-actions">
           <button type="submit" className="button button-primary">

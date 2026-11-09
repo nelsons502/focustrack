@@ -54,3 +54,10 @@ describe("findContrast", () => {
     expect(findContrast("")).toBeNull();
   });
 });
+
+describe("title contrast", () => {
+  it("uses a comparison named only in the title", () => {
+    const { prompts } = buildReflectionPrompts({ title: "Helm vs Kustomize", description: "Deploy." });
+    expect(prompts[3]).toContain("Helm and Kustomize");
+  });
+});

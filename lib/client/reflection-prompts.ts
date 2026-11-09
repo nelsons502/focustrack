@@ -35,7 +35,7 @@ export function buildReflectionPrompts(
     "What's one thing you could try at work after this talk?",
     "What was unclear or worth asking the speaker?",
   ];
-  const contrast = findContrast(session.description);
+  const contrast = findContrast(session.description) ?? findContrast(title);
   if (contrast) {
     prompts.push(
       `The talk compared ${contrast.first} and ${contrast.second}. Which fits your team, and why?`,

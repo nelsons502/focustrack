@@ -1,4 +1,5 @@
 import FindSearch from "../components/FindSearch";
+import ReflectLink from "../components/ReflectLink";
 
 const SCHEDULE_SOURCE_URL =
   "https://sessionize.com/api/v2/uo948i5p/view/markdown";
@@ -14,7 +15,7 @@ export default function HomePage() {
         </p>
       </header>
       <FindSearch />
-      <a className="button" href="/reflect">Reflect on today&rsquo;s talks (optional)</a>
+      <ReflectLink />
       <footer className="credit">
         <a href={SCHEDULE_SOURCE_URL}>Schedule data: CNCF / Sessionize</a>
       </footer>
