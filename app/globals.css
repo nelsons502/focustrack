@@ -716,3 +716,27 @@ body:has(.now-page) {
   align-items: center;
   min-height: 44px;
 }
+.export-calendar {
+  margin-top: 1rem;
+}
+
+.export-calendar-help {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.export-calendar .button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.export-calendar-status:empty {
+  margin: 0;
+}
+
+.export-calendar-status,
+.export-calendar-error {
+  margin: 0.5rem 0 0;
+  font-weight: 600;
+}
