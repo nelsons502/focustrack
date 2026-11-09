@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -74,7 +73,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   const requested = useRef(new Set<string>());
   const [announcement, setAnnouncement] = useState("");
   const [notesOpen, setNotesOpen] = useState(false);
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState({ text: "", sessionId: "" });
   const [skipped, setSkipped] = useState<Session | null>(null);
   const [retryToken, setRetryToken] = useState(0);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -151,10 +150,25 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   const currentNotes = current ? (localState.notes[current.id] ?? []) : [];
   const recentNotes = currentNotes.slice(-NOTES_SHOWN).reverse();
 
-  const closeNotes = useCallback(() => {
+  function saveDraft(): boolean | null {
+    if (!draft.sessionId || !draft.text.trim()) return null;
+    const saved = updateLocalState(
+      addNote(getLocalStateSnapshot(), draft.sessionId, draft.text, new Date()),
+    );
+    setDraft({ text: "", sessionId: "" });
+    setAnnouncement(
+      saved
+        ? "Note saved on this device."
+        : "Note kept for now, but saving on this device failed.",
+    );
+    return saved;
+  }
+
+  function closeNotes() {
+    saveDraft();
     setNotesOpen(false);
     toggleRef.current?.focus();
-  }, []);
+  }
 
   useEffect(() => {
     if (notesOpen) noteInputRef.current?.focus();
@@ -162,16 +176,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
 
   function handleSaveNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!current || !draft.trim()) return;
-    const saved = updateLocalState(
-      addNote(getLocalStateSnapshot(), current.id, draft, new Date()),
-    );
-    setDraft("");
-    setAnnouncement(
-      saved
-        ? "Note saved on this device."
-        : "Note kept for now, but saving on this device failed.",
-    );
+    saveDraft();
     noteInputRef.current?.focus();
   }
 
@@ -192,6 +197,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   function handleNotAttending() {
     if (!current) return;
     const title = current.title;
+    saveDraft();
     setSkipped(current);
     setNotesOpen(false);
     updateLocalState(markNotAttending(getLocalStateSnapshot(), current.id));
@@ -353,17 +359,19 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
                 onKeyDown={handleNotesKey}
               >
                 <form onSubmit={handleSaveNote} className="now-note-form">
-                  <label htmlFor="now-note-input">One line, saved on this device</label>
+                  <label htmlFor="now-note-input">One line at a time. Saved on this device when you press Enter, close, or move on</label>
                   <div className="now-note-row">
                     <input
                       ref={noteInputRef}
                       id="now-note-input"
                       type="text"
-                      value={draft}
+                      value={draft.text}
                       maxLength={280}
                       autoComplete="off"
                       enterKeyHint="done"
-                      onChange={(event) => setDraft(event.target.value)}
+                      onChange={(event) =>
+                        setDraft({ text: event.target.value, sessionId: current.id })
+                      }
                     />
                     <button type="submit" className="now-button now-button-primary">
                       Save note

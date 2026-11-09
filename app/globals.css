@@ -576,12 +576,12 @@ body:has(.now-page) {
   color: #0b0e13;
 }
 
-.now-page a.now-button-primary {
-  color: #0b0e13;
-}
-
 .now-page a.now-button {
   color: var(--now-fg);
+}
+
+.now-page a.now-button-primary {
+  color: #0b0e13;
 }
 
 .now-toggle {

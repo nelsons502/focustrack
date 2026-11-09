@@ -158,4 +158,19 @@ describe("NowScreen", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not be loaded/);
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
+
+  it("autosaves an unsent line when the drawer closes", async () => {
+    seedPlan(["cur"]);
+    mockSessions([current]);
+    render(<NowScreen nowParam={DEMO} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
+    fireEvent.change(screen.getByLabelText(/One line/), {
+      target: { value: "follow up on tracing" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Close notes" }));
+    expect(getLocalStateSnapshot().notes.cur.map((n) => n.text)).toEqual([
+      "follow up on tracing",
+    ]);
+    expect(screen.getByRole("button", { name: "Quick notes" })).toHaveFocus();
+  });
 });

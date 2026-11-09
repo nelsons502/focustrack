@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Session } from "../contract";
 import {
   describeStartsIn,
@@ -9,6 +9,7 @@ import {
   transitionNote,
   withNowParam,
 } from "./now";
+import { fetchSessionsByIds } from "./search-api";
 import { createDefaultLocalState } from "./local-state";
 import {
   addNote,
@@ -174,5 +175,20 @@ describe("now-actions", () => {
     const restored = undoNotAttending(skipped, "a");
     expect(restored.plan.sessionIds).toContain("a");
     expect(restored.plan.notAttending).toEqual([]);
+  });
+});
+
+describe("fetchSessionsByIds", () => {
+  it("splits large plans into requests of at most 50 ids", async () => {
+    const fetchMock = vi.fn(async (): Promise<Response> => ({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve([]),
+    }) as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    const ids = Array.from({ length: 120 }, (_, i) => `id${i}`);
+    await fetchSessionsByIds(ids, new AbortController().signal);
+    vi.unstubAllGlobals();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
