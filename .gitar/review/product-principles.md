@@ -19,4 +19,5 @@
 - Schedule data is credited to its source. Raw schedule text is not committed to this repository.
 
 ## Privacy
-- Plans and notes stay on the device. Anything sent to the server needs explicit consent at the moment of sharing, bounded input, and aggregates hidden below 5 responses.
+- Public session IDs may be sent to the schedule lookup API automatically to resolve the on-device plan. This lookup is approved; do not add a consent gate for it. Notes, reflections, breaks and energy settings remain on-device.
+- Plans and notes stay on the device. Any future sharing of private content needs explicit consent at the moment of sharing, bounded input, and aggregates hidden below 5 responses.

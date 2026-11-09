@@ -22,7 +22,7 @@ import {
   withReflection,
 } from "../lib/client/reflection";
 import { buildReflectionPrompts } from "../lib/client/reflection-prompts";
-import { fetchSessionsByIds } from "../lib/client/search-api";
+import { fetchSessionsByIds } from "../lib/client/sessions-api";
 import { formatEventInstant, formatEventRange, parseDemoNow } from "../lib/client/time";
 
 type View = { kind: "list" } | { kind: "session"; id: string } | { kind: "recap" };
