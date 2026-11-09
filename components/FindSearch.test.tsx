@@ -151,6 +151,29 @@ describe("FindSearch", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("shows a retryable error when every returned session is malformed", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({
+        results: [{ id: "s1", title: "Incomplete session", speakers: [] }],
+        mode: "hybrid",
+        tookMs: 1,
+      }))
+      .mockResolvedValue(jsonResponse({
+        results: [makeSession()], mode: "hybrid", tookMs: 1,
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<FindSearch />);
+    expect(await screen.findByText(
+      "Search is temporarily unavailable. Please try again shortly.",
+    )).toBeInTheDocument();
+    expect(screen.queryByText(/No sessions found/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Retry search/ }));
+    expect(await screen.findByRole("heading", {
+      name: "Kubernetes Basics Test Session",
+    })).toBeInTheDocument();
+  });
+
   it("submits an explicit search and labels keyword fallback honestly", async () => {
     const fetchMock = mockSearch({
       results: [makeSession()],

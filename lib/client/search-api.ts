@@ -133,8 +133,14 @@ export async function fetchSearch(
       "Search is temporarily unavailable. Please try again shortly.",
     );
   }
+  const results = body.results.filter(isSession);
+  if (body.results.length > 0 && results.length === 0) {
+    throw new Error(
+      "Search is temporarily unavailable. Please try again shortly.",
+    );
+  }
   return {
-    results: body.results.filter(isSession),
+    results,
     mode: body.mode,
     tookMs: typeof body.tookMs === "number" ? body.tookMs : 0,
   };
