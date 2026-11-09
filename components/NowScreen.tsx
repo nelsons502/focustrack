@@ -44,7 +44,7 @@ import {
 import { fetchSessionsByIds } from "../lib/client/sessions-api";
 import { formatEventTime } from "../lib/client/time";
 import PrimaryNav from "./plan/PrimaryNav";
-import { useLargeScreen } from "./now/useLargeScreen";
+import { LARGE_SCREEN_QUERY, useLargeScreen } from "./now/useLargeScreen";
 
 const NOTE_DEBOUNCE_MS = 500;
 
@@ -199,12 +199,18 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   }, [draft]);
 
   useEffect(() => {
-    if (isLarge && sheetOpen) {
-      flushDraftRef.current();
-      setSheetOpen(false);
-      noteInputRef.current?.focus();
-    }
-  }, [isLarge, sheetOpen]);
+    if (typeof window.matchMedia !== "function") return undefined;
+    const query = window.matchMedia(LARGE_SCREEN_QUERY);
+    const onChange = () => {
+      if (query.matches) {
+        flushDraftRef.current();
+        restoreNotesFocus.current = true;
+        setSheetOpen(false);
+      }
+    };
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     const onPageHide = () => flushDraftRef.current();
