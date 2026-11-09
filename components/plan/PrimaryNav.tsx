@@ -8,7 +8,7 @@ import { withNowParam } from "../../lib/client/now";
 export type PrimaryNavCurrent = "find" | "plan" | "now" | "reflect";
 
 type PrimaryNavProps = {
-  current: PrimaryNavCurrent;
+  current?: PrimaryNavCurrent;
   nowParam?: string;
 };
 
@@ -19,20 +19,28 @@ const LINKS: ReadonlyArray<{ key: PrimaryNavCurrent; label: string; path: string
   { key: "reflect", label: "Reflect", path: "/reflect" },
 ];
 
-function subscribe(): () => void {
-  return () => undefined;
+function subscribe(onStoreChange: () => void): () => void {
+  window.addEventListener("popstate", onStoreChange);
+  return () => window.removeEventListener("popstate", onStoreChange);
 }
 
-function getSearch(): string {
-  return window.location.search;
+function getLocation(): string {
+  return `${window.location.pathname}${window.location.search}`;
 }
 
-function getServerSearch(): string {
+function getServerLocation(): string {
   return "";
 }
 
+function currentFromPathname(pathname: string): PrimaryNavCurrent | undefined {
+  const link = LINKS.find((entry) => entry.path === pathname);
+  return link?.key;
+}
+
 export default function PrimaryNav({ current, nowParam }: PrimaryNavProps) {
-  const search = useSyncExternalStore(subscribe, getSearch, getServerSearch);
+  const location = useSyncExternalStore(subscribe, getLocation, getServerLocation);
+  const [pathname, search = ""] = location.split("?");
+  const resolvedCurrent = current ?? currentFromPathname(pathname ?? "");
   const raw = nowParam ?? new URLSearchParams(search).get("now");
   return (
     <nav aria-label="Primary" className="primary-nav">
@@ -40,8 +48,8 @@ export default function PrimaryNav({ current, nowParam }: PrimaryNavProps) {
         <Link
           key={link.key}
           href={withNowParam(link.path, raw)}
-          className={current === link.key ? "nav-link nav-link-current" : "nav-link"}
-          aria-current={current === link.key ? "page" : undefined}
+          className={resolvedCurrent === link.key ? "nav-link nav-link-current" : "nav-link"}
+          aria-current={resolvedCurrent === link.key ? "page" : undefined}
         >
           {link.label}
         </Link>

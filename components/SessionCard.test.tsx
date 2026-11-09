@@ -146,7 +146,7 @@ describe("SessionCard interactions", () => {
     rerender(
       <SessionCard session={makeSession()} inPlan onTogglePlan={vi.fn()} />,
     );
-    expect(screen.getByRole("button", { name: /Add to plan/ })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /In your plan/ })).toHaveAttribute(
       "aria-pressed",
       "true",
     );

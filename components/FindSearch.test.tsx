@@ -278,7 +278,7 @@ describe("FindSearch", () => {
     expect(saved.energy.flagLoudRooms).toBe(true);
     expect(
       screen.getByRole("button", {
-        name: "Add to plan: Kubernetes Basics Test Session",
+        name: "In your plan: Kubernetes Basics Test Session",
       }),
     ).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText(/added to your plan/)).toBeInTheDocument();
