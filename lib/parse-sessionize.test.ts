@@ -40,6 +40,25 @@ describe('Sessionize real Markdown excerpts', () => {
   it('fails clearly on malformed session metadata rather than silently losing sessions', () => {
     expect(() => parseSessionize('### Tuesday, November 10, 2026\n- [Talk](https://sessionize.com/api/v2/uo948i5p/view/markdown/session/1)\n  TBD')).toThrow(/session 1/i);
   });
+  it('ends the real 7 pm to midnight session on the next day while keeping the start-day facet', () => {
+    const excerpt = readFileSync(join(process.cwd(), 'lib/__fixtures__/overnight.md'), 'utf8');
+    expect(parseSessionize(excerpt)[0]).toMatchObject({
+      id: '1340051', day: '2026-11-11',
+      startsAt: '2026-11-11T19:00:00-07:00', endsAt: '2026-11-12T00:00:00-07:00',
+    });
+  });
+  it.each([
+    ['Thursday, December 31, 2026', '11:00 pm', '12:00 am', '2027-01-01T00:00:00-07:00'],
+    ['Sunday, February 28, 2027', '7:00 pm', '7:00 pm', '2027-03-01T19:00:00-07:00'],
+  ])('rolls overnight end dates across the calendar from %s', (date, start, end, endsAt) => {
+    expect(parseSessionize(`### ${date}\n- [Talk](https://sessionize.com/api/v2/uo948i5p/view/markdown/session/1)\n  ${start} - ${end} · Online`)[0].endsAt).toBe(endsAt);
+  });
+  it('does not infer ballroom crowd size for the North Grand Ballroom Foyer', () => {
+    const foyerSchedule = readFileSync(join(process.cwd(), 'lib/__fixtures__/foyer.md'), 'utf8');
+    expect(parseSessionize(foyerSchedule).find(s => s.id === '1368996')).toMatchObject({
+      crowdEstimate: 'unknown', crowdBasis: 'unknown',
+    });
+  });
 });
 
 it.each(['Coat + Bag Check', '☕ Coffee Break', 'Registration + Badge Pick-Up', '🍲 Lunch | On Own'])(

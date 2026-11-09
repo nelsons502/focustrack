@@ -57,12 +57,19 @@ export function parseSessionize(markdown: string, details: Record<string, string
     const speakers = [...speakerSection.matchAll(/^- \[(.*?)\]\([^\n]+?\)(?: — (.*))?$/gm)].map(match => ({
       name: unescape(match[1]), company: unescape(match[2] ?? ''),
     }));
-    const ballroom = /ballroom/i.test(room);
+    const ballroom = /ballroom/i.test(room) && !/\bfoyer\b/i.test(room);
     const breakout = venue === 'Salt Palace' && level !== null && /^(?:\d{3}\b|Grand Ballroom)/i.test(roomParts[2] ?? '');
+    const startsAt = timestamp(day, start);
+    let endsAt = timestamp(day, end);
+    if (endsAt <= startsAt) {
+      const nextDay = new Date(`${day}T00:00:00Z`);
+      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+      endsAt = timestamp(nextDay.toISOString().slice(0, 10), end);
+    }
     sessions.push({
       id, eventId: 'kccncna2026', title, description: section(detail, 'Description'),
       speakers: speakers.length ? speakers : names ? names.split(', ').map(name => ({name: unescape(name), company: ''})) : [],
-      startsAt: timestamp(day, start), endsAt: timestamp(day, end), day, room, venue, level, kind, restrictions,
+      startsAt, endsAt, day, room, venue, level, kind, restrictions,
       crowdEstimate: kind === 'keynote' || ballroom ? 'large' : 'unknown',
       crowdBasis: kind === 'keynote' ? 'keynote room' : ballroom ? 'ballroom' : 'unknown',
       captions: breakout ? 'wordly-breakout' : 'unknown', sourceUrl,

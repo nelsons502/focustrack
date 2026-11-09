@@ -1,11 +1,31 @@
 import { pathToFileURL } from 'node:url';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { createElasticClient, indexSessions } from '../lib/elastic.ts';
 import { parseSessionize } from '../lib/parse-sessionize.ts';
 
 const source = 'https://sessionize.com/api/v2/uo948i5p/view/markdown';
+
+function markdownError(markdown: string, relativeFile: string, url: string): string | undefined {
+  const normalized = markdown.replace(/\r/g, '');
+  if (!normalized.startsWith('# ') || /[\u0000\ufffd]/.test(normalized)) return `Sessionize returned invalid Markdown for ${relativeFile}`;
+  const requestedId = /\/session\/(\d+)\/?$/.exec(new URL(url).pathname)?.[1];
+  if (requestedId && /^- \*\*Session ID:\*\* (\d+)$/m.exec(normalized)?.[1] !== requestedId) {
+    return `Sessionize Session ID must match ${requestedId} for ${relativeFile}`;
+  }
+  if (relativeFile === 'schedule.md') {
+    const advertised = /^- \*\*Sessions:\*\* (\d+)$/m.exec(normalized)?.[1];
+    if (!advertised || +advertised === 0) return 'Sessionize schedule is missing a positive Sessions count';
+    const ids = [...normalized.matchAll(/^- \[.*\]\(https:\/\/sessionize\.com\/api\/v2\/[^/]+\/view\/markdown\/session\/(\d+)\)$/gm)].map(match => match[1]);
+    if (ids.length !== +advertised || new Set(ids).size !== +advertised) {
+      return `Sessionize schedule expected ${advertised} sessions; found ${ids.length} entries (${new Set(ids).size} unique)`;
+    }
+    try { parseSessionize(normalized); }
+    catch (error) { return error instanceof Error ? error.message : 'Invalid schedule metadata'; }
+  }
+}
 
 export function parseOptions(args: string[]): {day?: string; recreate: boolean} {
   const options: {day?: string; recreate: boolean} = {recreate:false};
@@ -24,16 +44,23 @@ export function createMarkdownFetcher(cacheDirectory = '.cache') {
   let lastRequestAt = 0;
   return async (relativeFile: string, url: string): Promise<string> => {
     const file = join(cacheDirectory, relativeFile);
-    try { return await readFile(file, 'utf8'); }
+    let cached: string | undefined;
+    try { cached = await readFile(file, 'utf8'); }
     catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error; }
+    if (cached !== undefined && !markdownError(cached, relativeFile, url)) return cached;
     await sleep(Math.max(0, 1000 - (Date.now() - lastRequestAt)));
     lastRequestAt = Date.now();
     const response = await fetch(url, {signal:AbortSignal.timeout(30_000)});
     if (!response.ok) throw new Error(`Sessionize fetch failed for ${relativeFile}: HTTP ${response.status}`);
     const markdown = await response.text();
-    if (!markdown.startsWith('# ')) throw new Error(`Sessionize returned invalid Markdown for ${relativeFile}`);
+    const error = markdownError(markdown, relativeFile, url);
+    if (error) throw new Error(error);
     await mkdir(dirname(file), {recursive:true});
-    await writeFile(file, markdown);
+    const temporary = `${file}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(temporary, markdown, {flag:'wx'});
+      await rename(temporary, file);
+    } finally { await rm(temporary, {force:true}); }
     return markdown;
   };
 }
