@@ -172,18 +172,6 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
     return saved;
   }
 
-  // A session transition must save its draft and close its session-scoped drawer.
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    if (draft.sessionId && current?.id !== draft.sessionId) {
-      saveDraft();
-      if (notesOpen) toggleRef.current?.focus();
-      setNotesOpen(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.id]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
   function closeNotes() {
     saveDraft();
     setNotesOpen(false);
@@ -388,7 +376,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
                 onKeyDown={handleNotesKey}
               >
                 <form onSubmit={handleSaveNote} className="now-note-form">
-                  <label htmlFor="now-note-input">One line at a time. Saved on this device when you press Enter, close, or move on</label>
+                  <label htmlFor="now-note-input">One line at a time. Press Enter, Save note, or Close notes to save on this device.</label>
                   <div className="now-note-row">
                     <input
                       ref={noteInputRef}

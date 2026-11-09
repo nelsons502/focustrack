@@ -174,7 +174,7 @@ describe("NowScreen", () => {
     expect(screen.getByRole("button", { name: "Quick notes" })).toHaveFocus();
   });
 
-  it("autosaves an unsent line and closes notes when its session ends", async () => {
+  it("keeps an unsent line focused on its original session when the next session starts", async () => {
     seedPlan(["cur", "nxt"]);
     mockSessions([current, next]);
     const { rerender } = render(<NowScreen nowParam={DEMO} />);
@@ -186,9 +186,14 @@ describe("NowScreen", () => {
     rerender(<NowScreen nowParam="2026-11-10T11:50-07:00" />);
 
     expect(await screen.findByText("Session nxt")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Notes for Session cur" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/One line/)).toHaveValue("ask about the next session");
+    expect(screen.getByLabelText(/One line/)).toHaveFocus();
+    fireEvent.click(screen.getByRole("button", { name: "Close notes" }));
     expect(getLocalStateSnapshot().notes.cur.map((note) => note.text)).toEqual([
       "ask about the next session",
     ]);
+    expect(getLocalStateSnapshot().notes.nxt).toBeUndefined();
     expect(screen.queryByLabelText(/One line/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Quick notes" })).toHaveFocus();
   });
