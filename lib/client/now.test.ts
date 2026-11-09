@@ -9,7 +9,7 @@ import {
   transitionNote,
   withNowParam,
 } from "./now";
-import { fetchSessionsByIds } from "./search-api";
+import { fetchSessionsByIds } from "./sessions-api";
 import { createDefaultLocalState } from "./local-state";
 import {
   addNote,

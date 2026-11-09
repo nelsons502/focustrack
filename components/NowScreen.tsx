@@ -37,7 +37,7 @@ import {
   undoLastNote,
   undoNotAttending,
 } from "../lib/client/now-actions";
-import { fetchSessionsByIds } from "../lib/client/search-api";
+import { fetchSessionsByIds } from "../lib/client/sessions-api";
 import { formatEventTime } from "../lib/client/time";
 
 const CLOCK_TICK_MS = 30_000;

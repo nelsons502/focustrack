@@ -1,6 +1,7 @@
 # FocusTrack on Radar and Kubernetes
 
-The primary demo URL is `https://focustrack.cnh.radarhq.io`. Vercel is the fallback.
+The primary demo URL is `https://focustrack.cnh.radarhq.io`. Vercel is a cold,
+manual fallback; its GitHub integration is disconnected.
 The orchestrator performs Radar MCP and cluster operations; the build manager
 prepares and validates the release files.
 
@@ -18,11 +19,23 @@ Argo CD can read it without credentials.
 
 **Deployment and Pod.** A Pod is a running copy of the container. The Deployment
 in `deploy/deployment.yaml` keeps two copies running and replaces them gradually
-when the image changes. Each requests 100m CPU (one tenth of a CPU) and 128 MiB of
-memory, with limits of 500m CPU and 512 MiB. The limit allows more memory than the
-starter's tiny Node server because Next.js runs here. Both copies and the extra
+when the image changes. The approved hardening requests 25m CPU (one fortieth of
+a CPU) and 96 MiB of memory per Pod, retaining limits of 500m CPU and 512 MiB.
+The limit allows more memory than the starter's tiny Node server because Next.js
+runs here. Both copies and the extra
 Pod during a rollout fit the starter's stated team budget. Containers run as
-user/group 1000 without extra capabilities or a Kubernetes API token.
+user/group 1000 without extra capabilities or a Kubernetes API token. The approved
+configuration makes the root filesystem read-only, with separate writable
+`emptyDir` volumes at `/tmp` and `/app/.next/cache`. Pod `fsGroup: 1000` gives
+that group write access to these volumes; their contents disappear with the Pod.
+No image change is needed for these runtime mounts.
+
+`deploy/pdb.yaml` requires at least one available matching Pod during voluntary
+evictions, such as a node drain. This does not protect against involuntary node
+failure or govern Deployment rolling updates. A topology spread constraint
+prefers distributing matching Pods across `kubernetes.io/hostname`, with
+`maxSkew: 1` and `ScheduleAnyway`. This soft preference allows scheduling on a
+single node and does not block rollout when another node is unavailable.
 
 **Service.** Pods can be replaced and get new addresses. `deploy/service.yaml`
 provides the stable name `app`, accepts port 80, and forwards to the matching
@@ -65,7 +78,7 @@ not frozen into the image. Neither endpoint returns the Elastic URL or key.
 **Argo CD Application and GitOps.** GitOps means the files in git describe what
 should run. `argocd/application.yaml` tells Argo CD to watch this repository's
 `main` branch, build the Kustomize configuration under `deploy/`, and reconcile
-the team namespace. Kustomize combines the three manifests and replaces image
+the team namespace. Kustomize combines the four manifests and replaces image
 `app` with the GHCR name and tag in `deploy/kustomization.yaml`. Automatic sync
 deploys changes, self-heal restores accidental edits, and prune removes resources
 that this Application previously managed and that are later removed from git.
@@ -87,7 +100,7 @@ Applications reconciling the same Deployment and Service.
    as non-root, listening on `0.0.0.0:8080`. Elastic credentials are runtime-only.
 2. The team is `focustrack`: namespace `team-focustrack`, Argo CD project
    `team-focustrack`, public URL `https://focustrack.cnh.radarhq.io`. The Radar
-   cluster id is looked up once in Radar and used on every Radar MCP call.
+   cluster id is `uRdEIEL90Yk`, used on every Radar MCP call.
 3. A merge/push to `main` triggers `.github/workflows/image.yml` (`build-and-deploy`).
    Manual `workflow_dispatch` also works when run against `main`; other refs are
    skipped. Like the starter, pushes changing only Markdown and/or
@@ -124,8 +137,8 @@ Applications reconciling the same Deployment and Service.
 
 ## Manager handoff and validation
 
-Use Radar's cluster list to find the entry named exactly `focustrack`; record its
-id as `<cluster-id>` and pass it as `cluster` on every subsequent Radar MCP call.
+The confirmed Radar cluster is `focustrack`, id `uRdEIEL90Yk`. The orchestrator
+passes `uRdEIEL90Yk` as `cluster` on every subsequent Radar MCP call.
 Pass namespace `team-focustrack` wherever supported. Never select the platform
 cluster `cnh` or another team's cluster. Keep all owned application changes in
 git; direct cluster edits will be undone by self-heal. No kubectl or Radar
@@ -186,38 +199,100 @@ container smoke test using the cached Node 22 Alpine image with the bundle
 mounted read-only. Node ran as uid 1000 on port 8080: home and `/healthz` returned
 200; `/readyz` returned 503 without credentials and 200 with live Elastic
 credentials passed only through the process environment. This verifies the
-standalone runtime and real probe connectivity, not the incomplete image build. No cluster deployment,
-Radar investigation, or Checks screenshot has been performed by the build manager.
+standalone runtime and real probe connectivity, not the incomplete image build.
+The build manager performed no cluster deployment or Radar operations; later
+live evidence below was supplied by the orchestrator.
 
-## Radar story — presentation draft
+### C2 hardening validation (13:02 MT)
 
-This is an evidence template, not a claim that deployment or investigation happened.
+On branch `c/hardening`, Node 22.19.0 passed `npm run typecheck`, `npm run lint`,
+`npm test` (171 tests in nine files), and `npm run build`. Lint retained seven
+baseline `@typescript-eslint/no-unused-vars` warnings in `lib/elastic-search.ts`
+(lines 40–46); there were no errors. Dependencies were already installed;
+`npm ci` was not rerun and no dependencies were added.
 
-| Moment (America/Denver) | Evidence to capture | Status |
+The existing Ruby YAML parser loaded all four Kustomize resource files. Local
+validation checked namespaces, selectors, uid/gid/fsGroup, writable mount
+references, read-only root, soft spread, disruption budget, requests and limits;
+it also confirmed replicas, Service port, and Secret environment references were
+preserved. No standalone Kustomize or Kubernetes schema validator was available.
+This is local manifest validation, not a Kustomize render, API schema validation,
+or server-side admission check. No Kubernetes commands were invoked.
+
+An actual Linux arm64 smoke used the cached `node:22-bookworm` image with the
+fresh standalone bundle and static assets mounted read-only. The root filesystem
+was read-only, capabilities were dropped, privilege escalation was disabled, and
+Node ran as uid/gid 1000. Writable tmpfs mounts at `/tmp` and `/app/.next/cache`
+were root-owned with group 1000 and mode 1770, exercising group write access
+corresponding to the intended `fsGroup` permissions. Both accepted writes; a
+write outside them failed with `EROFS`. Home, a real static JavaScript asset,
+and `/healthz` returned 200; `/readyz` returned 503 without credentials. The
+container was removed afterward. No image pull, credential use, or host `/tmp`
+write was needed. This validates runtime compatibility; it does not replace
+verification of Kubernetes volume ownership or the exact Alpine production image.
+Dockerfile is unchanged. Hardening is committed and reviewed in PR #15;
+the deployed Alpine image and Kubernetes volume permissions still need live verification.
+
+## Radar story — evidence and pending verification
+
+All times below are America/Denver on November 9, 2026. These live observations
+were supplied by the orchestrator for cluster `focustrack` (`uRdEIEL90Yk`),
+namespace `team-focustrack`; this worker did not query Radar or the cluster.
+
+| Moment | Observed evidence | Status |
 | --- | --- | --- |
-| First hour | Namespace Checks screenshot before app changes | Not yet captured |
-| First successful release | Timeline event, source SHA, image tag, ready Pods, public URL | Not yet verified |
-| Feature releases or a real failure | Timeline diff and the decision it informed | Not yet recorded |
-| AI investigation | Question, target, findings, evidence, and action or all-clear | Not yet run |
-| 16:00 | Checks screenshot after changes, same namespace filter | Not yet captured |
-| Presentation | Explain whom FocusTrack helps and one decision Radar informed | Draft after evidence exists |
+| 12:28 initial rollout | The orchestrator confirmed the first real rollout. | Initial rollout recorded |
+| 12:41 fallback change | Vercel GitHub integration disconnected; environment variables retained. | Cold/manual fallback; no automatic previews or builds |
+| 12:54 hybrid live | A real Tuesday query returned 30 real results with mode `hybrid`. Search rollout was healthy: 2/2 ready, zero restarts. | Live feature evidence supplied by orchestrator |
+| Before hardening | CPU 6–7m and memory 47 MiB per Pod versus requests 100m/128 MiB. Four medium Checks: no read-only root, no disruption budget, no topology spread, and orphan `app-code` ConfigMap. | Real baseline; before screenshot capture not confirmed here |
+| 12:56 decision | Approve read-only root with writable temporary/cache volumes, a minimum-one disruption budget, soft node spreading, and requests 25m/96 MiB with existing limits. | Prepared in git; rollout and after Checks pending |
+| AI investigation, completed 12:57 | Radar found 2/2 replicas healthy, no active issues, and a missing disruption budget. It attributed the isolated startup warning to a rollout-time race. | Point-in-time assessment; PDB included in PR #15; no sustained-health guarantee |
+| After hardening | Orchestrator must verify the deployed revision, readiness, restarts, resource use, and Checks using the same namespace filter. | Reviewed; release and live verification pending |
 
-The orchestrator should run at least one hosted AI investigation on the running app;
-an all-clear after a release counts. Never deliberately break the app. Investigations
-start private; the person who starts it must present it or deliberately share it
-(sharing exposes it to all hackathon teams). Findings need primary evidence before
-changing the app. Use these pages after replacing the placeholders:
+**Decision Radar helped us make.** Checks exposed missing filesystem and
+availability safeguards, while live usage showed room to reduce resource
+reservations. The approved configuration narrows writable paths, protects one
+Pod during voluntary evictions, prefers different nodes without blocking a
+single-node rollout, and reduces requests while retaining the existing limits.
+These are intended improvements; no after state has yet been observed.
 
-- Timeline: `https://app.radarhq.io/c/<cluster-id>/timeline`.
-- Application: `https://app.radarhq.io/c/<cluster-id>/resources/applications?resource=team-focustrack/app-focustrack&apiGroup=argoproj.io`.
-- Deployment/investigation target: `https://app.radarhq.io/c/<cluster-id>/resources/deployments?resource=team-focustrack/app`.
-- Team Checks before and after: `https://app.radarhq.io/checks?scope=<cluster-id>&namespace=team-focustrack`.
-- Hosted investigations: `https://app.radarhq.io/c/<cluster-id>/investigations`.
+The orphan `app-code` ConfigMap is outside this worker's changes. Only the
+orchestrator may remove it after checking references. Its Check remains pending.
+Never deliberately break the app for the presentation. Investigations start
+private; the person who starts one must present it or deliberately share it
+(sharing exposes it to all hackathon teams). Verify findings against primary
+evidence before acting.
+
+- Timeline: `https://app.radarhq.io/c/uRdEIEL90Yk/timeline`.
+- Application: `https://app.radarhq.io/c/uRdEIEL90Yk/resources/applications?resource=team-focustrack/app-focustrack&apiGroup=argoproj.io`.
+- Deployment/investigation target: `https://app.radarhq.io/c/uRdEIEL90Yk/resources/deployments?resource=team-focustrack/app`.
+- Team Checks before and after: `https://app.radarhq.io/checks?scope=uRdEIEL90Yk&namespace=team-focustrack`.
+- Hosted investigations: `https://app.radarhq.io/c/uRdEIEL90Yk/investigations`.
+- Completed investigation: `https://app.radarhq.io/c/uRdEIEL90Yk/investigations/chat_ie6DbFJiQMGlhJN_?org=org_NCJbssDGEBsU`.
 
 ## If the cluster breaks
 
-Switch the presentation to the Vercel fallback at
-`https://focustrack-cnh.vercel.app`. Configure `ES_URL` and `ES_API_KEY` in
-Vercel's environment settings, never in git. Keep the last known good fallback
-available, and use Radar evidence to explain the cluster problem without spending
-the demo debugging. Vercel continues to build pull-request previews and serves as the fallback deployment.
+Vercel at `https://focustrack-cnh.vercel.app` is a **cold/manual fallback**.
+Its GitHub integration was disconnected at 12:41 MT; `ES_URL` and `ES_API_KEY`
+were retained. There are no automatic Vercel previews or builds anymore. Do not
+assume its existing deployment matches the current primary release.
+
+Before using this fallback, the operator checks the intended `main` revision in
+`~/Projects/focustrack`, then runs `vercel deploy --prod` from that directory.
+The operator verifies the resulting URL and feature behavior before switching
+the presentation. Keep credentials out of git and use Radar evidence to explain
+the cluster problem without spending the demo debugging. This worker did not
+invoke Vercel or change its settings.
+
+## Dash0 runtime configuration
+
+The Deployment also reads `DASH0_OTLP_ENDPOINT` and `DASH0_AUTH_TOKEN` from a
+separate Secret, `dash0-credentials`, keys `dash0-endpoint` and `dash0-token`.
+Nelson approved this separate Secret; `app-credentials` is retained solely for
+Elastic (`es-url` and `es-api-key`). Create `dash0-credentials` the same way as
+`app-credentials`: namespace `team-focustrack`, type `Opaque`, values entered
+under `stringData` in Radar Cloud. These references are optional so a missing
+Secret or key cannot prevent app startup. Server
+telemetry is supplied by the D observability PR; after that PR lands, it remains disabled until both values exist and the workload is restarted.
+The orchestrator or Nelson manages Secret values; they never belong in git.
+Argo CD leaves this manually created Secret alone.

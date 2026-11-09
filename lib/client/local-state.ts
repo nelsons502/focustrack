@@ -4,12 +4,14 @@ import {
   type EnergySettings,
   type LocalState,
   type NoteEntry,
+  type PlanBreak,
   type Reflection,
 } from "../contract";
+import { normalizePlanBreaks } from "./plan";
 
 export function createDefaultLocalState(): LocalState {
   return {
-    plan: { sessionIds: [], notAttending: [] },
+    plan: { sessionIds: [], notAttending: [], breaks: [] },
     notes: {},
     energy: { ...DEFAULT_ENERGY_SETTINGS },
   };
@@ -116,7 +118,7 @@ export function parseLocalState(value: unknown): LocalState {
     (id) => !sessionIds.includes(id),
   );
   const state: LocalState = {
-    plan: { sessionIds, notAttending },
+    plan: { sessionIds, notAttending, breaks: normalizePlanBreaks(plan.breaks) },
     notes: parseNotes(value.notes),
     energy: parseEnergy(value.energy),
   };
@@ -156,6 +158,7 @@ export function addSessionToPlan(state: LocalState, id: string): LocalState {
   return {
     ...state,
     plan: {
+      ...state.plan,
       sessionIds: [...state.plan.sessionIds, id],
       notAttending: state.plan.notAttending.filter((item) => item !== id),
     },
@@ -172,6 +175,27 @@ export function removeSessionFromPlan(
     plan: {
       ...state.plan,
       sessionIds: state.plan.sessionIds.filter((item) => item !== id),
+    },
+  };
+}
+
+export function addBreakToPlan(state: LocalState, planBreak: PlanBreak): LocalState {
+  const [valid] = normalizePlanBreaks([planBreak]);
+  if (!valid) return state;
+  const existing = normalizePlanBreaks(state.plan.breaks ?? []);
+  const next = normalizePlanBreaks([...existing, valid]);
+  if (next.length === existing.length) return state;
+  return { ...state, plan: { ...state.plan, breaks: next } };
+}
+
+export function removeBreakFromPlan(state: LocalState, id: string): LocalState {
+  const existing = state.plan.breaks ?? [];
+  if (!existing.some((entry) => entry.id === id)) return state;
+  return {
+    ...state,
+    plan: {
+      ...state.plan,
+      breaks: existing.filter((entry) => entry.id !== id),
     },
   };
 }
