@@ -1,4 +1,5 @@
-export const EVENT_TIME_ZONE = "America/Denver";
+import { EVENT_UTC_OFFSET } from "../contract";
+import { EVENT_TIME_ZONE } from "../event";
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: EVENT_TIME_ZONE,
@@ -50,6 +51,16 @@ export function formatEventInstant(date: Date): string {
 
 export function parseDemoNow(raw: string | null): Date | null {
   if (!raw) return null;
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(raw)) return null;
-  return parseDate(raw);
+  if (
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(raw) &&
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/.test(
+      raw,
+    )
+  ) {
+    return null;
+  }
+  const withOffset = /(Z|[+-]\d{2}:\d{2})$/.test(raw)
+    ? raw
+    : `${raw}${EVENT_UTC_OFFSET}`;
+  return parseDate(withOffset);
 }

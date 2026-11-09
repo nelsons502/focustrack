@@ -1,8 +1,6 @@
 import type { Restriction, Session, SessionKind } from "../lib/contract";
+import { ACCESSIBILITY_SOURCE_URL } from "../lib/event";
 import { formatEventRange } from "../lib/client/time";
-
-export const ACCESSIBILITY_URL =
-  "https://events.linuxfoundation.org/kubecon-cloudnativecon-north-america/attend/inclusion-accessibility/";
 
 const RESTRICTION_LABELS: Record<Restriction, string> = {
   "sold-out": "Sold out",
@@ -81,7 +79,7 @@ export default function SessionCard({
         {session.captions === "wordly-breakout" ? (
           <li>
             Captions: Wordly live captions for breakout sessions.{" "}
-            <a href={ACCESSIBILITY_URL}>Official accessibility information</a>
+            <a href={ACCESSIBILITY_SOURCE_URL}>Official accessibility information</a>
           </li>
         ) : null}
       </ul>
@@ -89,10 +87,9 @@ export default function SessionCard({
         <button
           type="button"
           className={inPlan ? "button button-saved" : "button button-add"}
-          aria-pressed={inPlan}
           aria-label={
             inPlan
-              ? `Remove from plan: ${session.title}`
+              ? `In your plan — remove: ${session.title}`
               : `Add to plan: ${session.title}`
           }
           onClick={() => onTogglePlan(session)}

@@ -125,6 +125,32 @@ describe("FindSearch", () => {
     expect(screen.queryByText(/Wordly/)).not.toBeInTheDocument();
   });
 
+  it("ignores malformed sessions without breaking valid search results", async () => {
+    const malformed: unknown = {
+      ...makeSession({ title: "Malformed Session" }),
+      speakers: null,
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({
+          results: [malformed, makeSession()],
+          mode: "hybrid",
+          tookMs: 1,
+        }),
+      ),
+    );
+    render(<FindSearch />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Kubernetes Basics Test Session",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Malformed Session" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("submits an explicit search and labels keyword fallback honestly", async () => {
     const fetchMock = mockSearch({
       results: [makeSession()],
@@ -167,6 +193,17 @@ describe("FindSearch", () => {
     expect(await screen.findByText(/No sessions found/)).toBeInTheDocument();
   });
 
+  it("shows a friendly message when the network request fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    render(<FindSearch />);
+    expect(
+      await screen.findByText(
+        "Search is temporarily unavailable. Please try again shortly.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Failed to fetch/)).not.toBeInTheDocument();
+  });
+
   it("shows a friendly error with a working retry", async () => {
     const fetchMock = vi
       .fn()
@@ -205,7 +242,10 @@ describe("FindSearch", () => {
   it("saves a session to the on-device plan", async () => {
     mockSearch({ results: [makeSession()], mode: "hybrid", tookMs: 1 });
     render(<FindSearch />);
-    const add = await screen.findByRole("button", { name: /Add to plan/ });
+    const add = await screen.findByRole("button", {
+      name: "Add to plan: Kubernetes Basics Test Session",
+    });
+    expect(add).not.toHaveAttribute("aria-pressed");
     fireEvent.click(add);
     const raw = window.localStorage.getItem(LOCAL_STATE_KEY);
     expect(raw).not.toBeNull();
@@ -214,8 +254,10 @@ describe("FindSearch", () => {
     expect(saved.energy.buildingChangeMinutes).toBe(20);
     expect(saved.energy.flagLoudRooms).toBe(true);
     expect(
-      screen.getByRole("button", { name: /In your plan|Remove/ }),
-    ).toBeInTheDocument();
+      screen.getByRole("button", {
+        name: "In your plan — remove: Kubernetes Basics Test Session",
+      }),
+    ).toHaveTextContent("In your plan — remove");
     expect(screen.getByText(/added to your plan/)).toBeInTheDocument();
   });
 
@@ -232,6 +274,14 @@ describe("FindSearch", () => {
     expect(
       screen.getByRole("link", { name: /Clear demo time/ }),
     ).toBeInTheDocument();
+  });
+
+  it("interprets a bare demo time in the event time zone", async () => {
+    window.history.replaceState(null, "", "/?now=2026-11-10T11%3A15");
+    mockSearch({ results: [], mode: "lexical-fallback", tookMs: 1 });
+    render(<FindSearch />);
+    expect(await screen.findByText(/Demo time/)).toBeInTheDocument();
+    expect(screen.getByText(/11:15\s?AM/)).toBeInTheDocument();
   });
 
   it("ignores a stale response that arrives after a newer search", async () => {

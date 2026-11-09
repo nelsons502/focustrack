@@ -20,9 +20,10 @@ import {
 } from "../lib/client/local-state";
 import { fetchSearch, type SearchRequest } from "../lib/client/search-api";
 import { formatEventInstant, parseDemoNow } from "../lib/client/time";
+import { DEMO_DAY } from "../lib/event";
 import SessionCard from "./SessionCard";
 
-const DEFAULT_DAY = "2026-11-10";
+const DEFAULT_DAY = DEMO_DAY;
 const RESULT_LIMIT = 30;
 
 const DAY_OPTIONS: { value: string; label: string }[] = [
