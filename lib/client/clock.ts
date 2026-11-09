@@ -113,8 +113,9 @@ export function getNow(): Date {
 }
 
 export function startSim(simStartIso: string, speed: number): void {
-  const simStartMs = new Date(simStartIso).getTime();
-  if (!Number.isFinite(simStartMs) || !isValidSpeed(speed)) return;
+  const simStart = parseDemoNow(simStartIso);
+  if (!simStart || !isValidSpeed(speed)) return;
+  const simStartMs = simStart.getTime();
   const existing = readClock();
   writeClock({
     // Seeking an existing sim (jump to a moment) keeps its play/pause state,

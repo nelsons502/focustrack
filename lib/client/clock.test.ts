@@ -80,6 +80,11 @@ describe("sim clock math", () => {
     expect(getSimClock()).toMatchObject({ playing: false, speed: 300 });
   });
 
+  it("interprets offset-less start times in the event time zone", () => {
+    startSim("2026-11-10T11:10:00", 60);
+    expect(getNow().getTime()).toBe(SIM_MS);
+  });
+
   it("startSim seeks an existing sim while preserving its paused state", () => {
     startSim(SIM_ISO, 60);
     pauseSim();
