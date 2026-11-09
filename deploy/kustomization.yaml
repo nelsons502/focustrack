@@ -9,4 +9,4 @@ resources:
 images:
   - name: app
     newName: ghcr.io/nelsons502/focustrack
-    newTag: 376094e13d07b306fb90ea56340a2f13cc144d64
+    newTag: 40c06477fe2a68e43ff4aea2f6c942b30c2785cf
