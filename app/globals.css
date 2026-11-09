@@ -1,40 +1,73 @@
 :root {
-  --bg: #faf8f3;
-  --fg: #14243e;
-  --muted: #43536b;
-  --link: #0b4f8a;
-  --accent: #0e6b6b;
-  --accent-dark: #0a4f4f;
-  --accent-soft: #e3efec;
-  --focus: #0b4f8a;
-  --surface: #ffffff;
-  --border: #d8d2c4;
+  --bg: #faf7f0;
+  --fg: #1e2b25;
+  --muted: #45564d;
+  --link: #0b5563;
+  --accent: #14665c;
+  --accent-dark: #0d4d44;
+  --accent-soft: #e1efe6;
+  --focus: #0b5563;
+  --surface: #fffdf8;
+  --border: #6f8378;
+  --coral: #a63a28;
+  --on-coral: #ffffff;
   --chip-restriction-bg: #f7e8e0;
   --chip-restriction-fg: #6d2f16;
   --error-bg: #fdf0ec;
-  --error-border: #c46a4a;
+  --error-border: #a63a28;
   --on-accent: #ffffff;
+  --shadow-soft: 0 2px 12px rgb(30 43 37 / 0.08);
   color-scheme: light dark;
 }
 
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #10151f;
-    --fg: #e8edf5;
-    --muted: #aab6c8;
-    --link: #8cc4ff;
-    --accent: #4cc2b8;
-    --accent-dark: #7fd6cd;
-    --accent-soft: #173533;
+  :root:not([data-theme="light"]) {
+    --bg: #101a17;
+    --fg: #eef4ef;
+    --muted: #c3d2c7;
+    --link: #8fd8c8;
+    --accent: #7fd1b9;
+    --accent-dark: #9be0cb;
+    --accent-soft: #1e3a33;
     --focus: #ffd166;
-    --surface: #1a2230;
-    --border: #4a5870;
+    --surface: #1a2622;
+    --border: #6b8a7a;
+    --coral: #ffb09c;
+    --on-coral: #3a170d;
     --chip-restriction-bg: #4a2a1c;
     --chip-restriction-fg: #ffd2bd;
     --error-bg: #3a1d17;
     --error-border: #ff9b7a;
-    --on-accent: #08201f;
+    --on-accent: #0a1f1a;
+    --shadow-soft: 0 2px 12px rgb(0 0 0 / 0.35);
+    color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #101a17;
+  --fg: #eef4ef;
+  --muted: #c3d2c7;
+  --link: #8fd8c8;
+  --accent: #7fd1b9;
+  --accent-dark: #9be0cb;
+  --accent-soft: #1e3a33;
+  --focus: #ffd166;
+  --surface: #1a2622;
+  --border: #6b8a7a;
+  --coral: #ffb09c;
+  --on-coral: #3a170d;
+  --chip-restriction-bg: #4a2a1c;
+  --chip-restriction-fg: #ffd2bd;
+  --error-bg: #3a1d17;
+  --error-border: #ff9b7a;
+  --on-accent: #0a1f1a;
+  --shadow-soft: 0 2px 12px rgb(0 0 0 / 0.35);
+  color-scheme: dark;
 }
 
 *,
@@ -53,14 +86,89 @@ body {
   color: var(--fg);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 1rem;
-  line-height: 1.55;
+  line-height: 1.6;
   overflow-wrap: anywhere;
 }
 
 .shell {
-  max-width: 44rem;
+  max-width: 46rem;
   margin: 0 auto;
-  padding: 1.25rem 1rem 2.5rem;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.site-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.site-header-inner {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 0.6rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+}
+
+.site-name {
+  margin: 0;
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.site-header .primary-nav {
+  margin: 0;
+}
+
+.settings-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  margin-left: auto;
+  padding: 0.5rem 0.9rem;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--link);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.settings-link:hover {
+  background: var(--accent-soft);
+}
+
+/* Pages still render their own nav/app-name inside <main>; the shared
+   header above is the one visible copy, so hide only those nested ones. */
+main .primary-nav,
+main .app-name {
+  display: none;
+}
+
+body:has(.now-page) .site-header {
+  background: #141a22;
+  color: #dde3ea;
+  border-bottom-color: #3a4656;
+}
+
+body:has(.now-page) .site-header .nav-link,
+body:has(.now-page) .settings-link {
+  border-color: #3a4656;
+  background: #141a22;
+  color: #8fd6cc;
+}
+
+body:has(.now-page) .site-header a:focus-visible {
+  outline-color: #ffd479;
+}
+
+body:has(.now-page) .site-header .nav-link-current {
+  background: #1d2430;
+  border-color: #8fd6cc;
 }
 
 .shell:focus {
@@ -125,10 +233,10 @@ textarea:focus-visible,
 
 .demo-banner {
   margin: 0 0 1rem;
-  padding: 0.75rem 1rem;
+  padding: 0.9rem 1.1rem;
   background: var(--accent-soft);
   border: 1px solid var(--accent);
-  border-radius: 8px;
+  border-radius: 14px;
 }
 
 .demo-banner a {
@@ -142,10 +250,11 @@ textarea:focus-visible,
   flex-wrap: wrap;
   gap: 0.75rem 1rem;
   align-items: end;
-  padding: 1rem;
+  padding: 1.15rem;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 16px;
+  box-shadow: var(--shadow-soft);
 }
 
 .field {
@@ -168,7 +277,7 @@ textarea:focus-visible,
   min-height: 44px;
   padding: 0.5rem 0.65rem;
   border: 1.5px solid var(--muted);
-  border-radius: 6px;
+  border-radius: 10px;
   background: var(--surface);
   color: var(--fg);
   font: inherit;
@@ -206,7 +315,7 @@ textarea:focus-visible,
   min-height: 44px;
   min-width: 44px;
   padding: 0.55rem 1.1rem;
-  border-radius: 6px;
+  border-radius: 12px;
   border: 1.5px solid var(--accent-dark);
   font: inherit;
   font-weight: 600;
@@ -253,10 +362,10 @@ textarea:focus-visible,
 
 .state-box {
   margin: 1rem 0;
-  padding: 1rem;
+  padding: 1.15rem;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 14px;
 }
 
 .state-box p {
@@ -291,14 +400,15 @@ textarea:focus-visible,
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.85rem;
+  gap: 1rem;
 }
 
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 1rem;
+  border-radius: 16px;
+  box-shadow: var(--shadow-soft);
+  padding: 1.25rem;
 }
 
 .card-title {

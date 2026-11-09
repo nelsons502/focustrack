@@ -1,6 +1,6 @@
-import type { LocalState, NoteEntry, PlanBreak, Session } from "../../lib/contract";
+import { NOW_OPT_OUT_KEY, type LocalState, type NoteEntry, type PlanBreak, type Session } from "../../lib/contract";
 
-export const NOW_OPT_OUT_KEY = "focustrack:now-opt-out";
+export { NOW_OPT_OUT_KEY } from "../../lib/contract";
 export const HEADS_UP_WINDOW_MS = 10 * 60_000;
 export const REFLECT_WINDOW_MS = 15 * 60_000;
 

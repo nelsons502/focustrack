@@ -1,0 +1,95 @@
+.settings-view {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.settings-card {
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-soft);
+}
+
+.settings-card h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+
+.settings-card p {
+  margin: 0 0 1rem;
+}
+
+.settings-local-fields {
+  padding: 0;
+}
+
+.settings-local-fields legend {
+  padding: 0 0 0.5rem;
+}
+
+.settings-local-fields input[type="number"] {
+  min-height: 44px;
+  padding: 0.5rem 0.65rem;
+  border: 1.5px solid var(--muted);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  width: 100%;
+}
+
+.theme-fields {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.theme-fields legend {
+  padding: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 44px;
+  padding: 0.35rem 0.5rem;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.theme-option input[type="radio"] {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--accent-dark);
+}
+
+.settings-demo-link {
+  text-decoration: none;
+}
+
+.clear-confirm {
+  padding: 1rem;
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  border-radius: 12px;
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.button-coral {
+  background: var(--coral);
+  border-color: var(--coral);
+  color: var(--on-coral);
+}
