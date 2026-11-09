@@ -9,7 +9,8 @@
     "test": "vitest run",
     "build": "next build",
     "start": "next start",
-    "ingest": "node --experimental-strip-types scripts/ingest.ts"
+    "ingest": "node --experimental-strip-types scripts/ingest.ts",
+    "apply-summaries": "node --experimental-strip-types scripts/apply-summaries.ts"
   },
   "dependencies": {
     "@elastic/elasticsearch": "^9.5.1",

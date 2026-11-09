@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { createElasticClient, indexSessions } from '../lib/elastic.ts';
 import { parseSessionize } from '../lib/parse-sessionize.ts';
+import { loadSummaries, mergeSummaries } from '../lib/summaries.ts';
 
 const source = 'https://sessionize.com/api/v2/uo948i5p/view/markdown';
 
@@ -80,7 +81,9 @@ export async function main(): Promise<void> {
       details[session.id] = await fetchMarkdown(`sessions/${session.id}.md`, `${source}/session/${session.id}`);
       if ((i+1) % 25 === 0 || i+1 === selected.length) console.log(`Details ${i+1}/${selected.length}`);
     }
-    const sessions = parseSessionize(list, details).filter(session => !options.day || session.day === options.day);
+    const parsed = parseSessionize(list, details).filter(session => !options.day || session.day === options.day);
+    const { sessions, unmatched } = mergeSummaries(parsed, await loadSummaries());
+    console.log(`Merged ${sessions.filter(session => session.plainSummary).length} reviewed plain-language summaries${unmatched.length ? `; ${unmatched.length} summary IDs not in this selection: ${unmatched.join(', ')}` : ''}.`);
     await indexSessions(client, sessions, options.recreate);
     console.log(`Total ingest elapsed ${((performance.now()-started)/1000).toFixed(2)}s.`);
   } finally { await client.close(); }
