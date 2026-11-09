@@ -13,6 +13,28 @@
   --chip-restriction-fg: #6d2f16;
   --error-bg: #fdf0ec;
   --error-border: #c46a4a;
+  --on-accent: #ffffff;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #10151f;
+    --fg: #e8edf5;
+    --muted: #aab6c8;
+    --link: #8cc4ff;
+    --accent: #4cc2b8;
+    --accent-dark: #7fd6cd;
+    --accent-soft: #173533;
+    --focus: #ffd166;
+    --surface: #1a2230;
+    --border: #4a5870;
+    --chip-restriction-bg: #4a2a1c;
+    --chip-restriction-fg: #ffd2bd;
+    --error-bg: #3a1d17;
+    --error-border: #ff9b7a;
+    --on-accent: #08201f;
+  }
 }
 
 *,
@@ -67,6 +89,7 @@ a {
   color: var(--link);
 }
 
+summary:focus-visible,
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,
@@ -188,6 +211,8 @@ textarea:focus-visible,
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  max-width: 100%;
+  text-align: center;
   background: var(--surface);
   color: var(--accent-dark);
 }
@@ -195,7 +220,7 @@ textarea:focus-visible,
 .button-primary {
   background: var(--accent);
   border-color: var(--accent-dark);
-  color: #ffffff;
+  color: var(--on-accent);
 }
 
 .button-primary:hover {
@@ -278,6 +303,7 @@ textarea:focus-visible,
 
 .card-title {
   margin: 0 0 0.5rem;
+  overflow-wrap: anywhere;
   font-size: 1.1rem;
   line-height: 1.35;
 }
@@ -325,10 +351,52 @@ textarea:focus-visible,
 
 .card-desc {
   margin: 0.5rem 0 0;
+}
+
+.card-desc-clamped {
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.button-quiet {
+  margin-top: 0.35rem;
+  background: transparent;
+}
+
+.plan-state {
+  font-weight: 600;
+  color: var(--accent-dark);
+}
+
+.card-details {
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.card-details summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.card-details p {
+  margin: 0 0 0.5rem;
+}
+
+.card-source {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.card-source a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
 }
 
 .card-facts {
