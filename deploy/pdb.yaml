@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: app
+  namespace: team-focustrack
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: app
