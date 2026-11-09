@@ -11,7 +11,7 @@ import { fetchSessionsByIds } from "../lib/client/search-api";
 
 type ExportStatus = "idle" | "working" | "ready" | "error";
 
-const MAX_EXPORT_IDS = 50;
+const BATCH_SIZE = 50;
 const FILE_NAME = "focustrack-plan.ics";
 
 function downloadFile(content: string): void {
@@ -34,21 +34,34 @@ export default function ExportCalendarButton() {
   );
   const [status, setStatus] = useState<ExportStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
-  const ids = localState.plan.sessionIds.slice(0, MAX_EXPORT_IDS);
+  const ids = localState.plan.sessionIds;
   const empty = ids.length === 0;
 
   async function handleExport() {
     setStatus("working");
     setErrorMessage("");
     try {
-      const sessions = await fetchSessionsByIds(ids);
+      const batches: string[][] = [];
+      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+        batches.push(ids.slice(i, i + BATCH_SIZE));
+      }
+      const sessions = (
+        await Promise.all(batches.map((batch) => fetchSessionsByIds(batch)))
+      ).flat();
       const ordered = ids.flatMap((id) => {
         const match = sessions.find((session) => session.id === id);
         return match ? [match] : [];
       });
-      if (ordered.length === 0) throw new Error("Your sessions could not be loaded. Please try again shortly.");
+      if (ordered.length !== ids.length) {
+        throw new Error(
+          "Some sessions in your plan could not be loaded, so no calendar file was made. Please try again shortly.",
+        );
+      }
       downloadFile(
-        buildIcs(ordered, { notAttending: localState.plan.notAttending }),
+        buildIcs(ordered, {
+          notAttending: localState.plan.notAttending,
+          now: new Date(),
+        }),
       );
       setStatus("ready");
     } catch (error) {

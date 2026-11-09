@@ -9,7 +9,7 @@ export type PlanBreak = {
 export type IcsOptions = {
   notAttending?: readonly string[];
   breaks?: readonly PlanBreak[];
-  now?: Date;
+  now: Date;
 };
 
 const encoder = new TextEncoder();
@@ -18,7 +18,7 @@ const MAX_OCTETS = 75;
 export function escapeText(value: string): string {
   return value
     .replace(/\\/g, "\\\\")
-    .replace(/;/g, "\;")
+    .replace(/;/g, "\\;")
     .replace(/,/g, "\\,")
     .replace(/\r\n|\r|\n/g, "\\n");
 }
@@ -94,8 +94,8 @@ function buildEvent(fields: EventFields, stamp: string): string[] | null {
   return lines;
 }
 
-export function buildIcs(sessions: Session[], options: IcsOptions = {}): string {
-  const stamp = toUtcStamp(options.now ?? new Date()) ?? "19700101T000000Z";
+export function buildIcs(sessions: Session[], options: IcsOptions): string {
+  const stamp = toUtcStamp(options.now) ?? "19700101T000000Z";
   const skipped = new Set(options.notAttending ?? []);
   const lines = [
     "BEGIN:VCALENDAR",

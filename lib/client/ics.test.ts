@@ -33,7 +33,7 @@ const OPTIONS = { now: new Date("2026-11-09T20:00:00Z") };
 
 describe("escapeText", () => {
   it("escapes commas, semicolons, backslashes and newlines", () => {
-    expect(escapeText("a,b;c\\d\ne")).toBe("a\\,b\;c\\\\d\\ne");
+    expect(escapeText("a,b;c\\d\ne")).toBe("a\\,b\\;c\\\\d\\ne");
   });
 });
 
@@ -86,7 +86,7 @@ describe("buildIcs", () => {
       [makeSession({ title: "A, B; C", captions: "wordly-breakout" })],
       OPTIONS,
     ).replace(/\r\n /g, "");
-    expect(ics).toContain("SUMMARY:A\\, B\; C");
+    expect(ics).toContain("SUMMARY:A\\, B\\; C");
     expect(ics).toContain("LOCATION:Salt Palace\\, 250 A");
     expect(ics).toContain("Ada Example (Example Co)");
     expect(ics).toContain("https://example.test/s1");
