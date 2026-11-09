@@ -1,6 +1,6 @@
 # FocusTrack on Radar and Kubernetes
 
-The primary demo URL is `https://<team-name>.cnh.radarhq.io`. Vercel is the fallback.
+The primary demo URL is `https://focustrack.cnh.radarhq.io`. Vercel is the fallback.
 The manager handles cluster operations; this platform work only prepares files.
 
 ## What each piece does
@@ -26,10 +26,10 @@ user/group 1000 without extra capabilities or a Kubernetes API token.
 **Service.** Pods can be replaced and get new addresses. `deploy/service.yaml`
 provides the stable name `app`, accepts port 80, and forwards to the matching
 Pods on port 8080. Keep the Service name and port: the hackathon platform routes
-the public hostname to this exact Service in `team-<team-name>`.
+the public hostname to this exact Service in `team-focustrack`.
 
 **Route.** `deploy/httproute.yaml` retains the starter's HTTPRoute for
-`<team-name>.cnh.radarhq.io`, referencing Gateway `cnh` in namespace `gateway`.
+`focustrack.cnh.radarhq.io`, referencing Gateway `cnh` in namespace `gateway`.
 The starter explicitly says this route is inert inside the team's virtual cluster
 because there is no Gateway there. The host platform provides the real public
 routing and HTTPS termination. Do not install an ingress controller or change the
@@ -38,7 +38,7 @@ Service to NodePort or LoadBalancer to expose this app.
 **Secret.** `app-credentials` stores the Elastic endpoint and API key inside the
 cluster. Nelson creates it himself in Radar Cloud: choose the team's cluster,
 Resources → Secrets → Create Secret, name it `app-credentials`, choose namespace
-`team-<team-name>` and type `Opaque`, then enter keys `es-url` and `es-api-key`
+`team-focustrack` and type `Opaque`, then enter keys `es-url` and `es-api-key`
 under `stringData` in the UI and apply. `es-url` is the Elastic base HTTPS URL;
 `es-api-key` is the encoded API key value without the `ApiKey ` prefix. The
 Deployment's `secretKeyRef` passes these as `ES_URL` and `ES_API_KEY` at runtime.
@@ -67,8 +67,8 @@ the team namespace. Kustomize combines the three manifests and replaces image
 `app` with the GHCR name and tag in `deploy/kustomization.yaml`. Automatic sync
 deploys changes, self-heal restores accidental edits, and prune removes resources
 that this Application previously managed and that are later removed from git.
-The Application is named `app-<team-name>` and lives in `team-<team-name>`, using
-the preinstalled project `team-<team-name>`. It does not live in namespace
+The Application is named `app-focustrack` and lives in `team-focustrack`, using
+the preinstalled project `team-focustrack`. It does not live in namespace
 `argocd`. This team-specific Application name deliberately differs from the
 starter's name `app`; use this name when inspecting or syncing it through Radar.
 If an existing Application named `app` already owns these resources, the manager
@@ -83,11 +83,9 @@ Applications reconciling the same Deployment and Service.
    `.next/standalone`, `.next/static`, and `public` to the production image.
    It creates an empty `public` directory if none exists. It runs `node server.js`
    as non-root, listening on `0.0.0.0:8080`. Elastic credentials are runtime-only.
-2. The manager replaces the literal team placeholder throughout `deploy/`,
-   `argocd/`, and this document before deployment. Until then the namespace and
-   hostnames are intentionally invalid placeholders. The cluster id placeholder
-   is documentation only. Use one literal replacement for the team name across
-   these files; do not substitute a guessed name.
+2. The team is `focustrack`: namespace `team-focustrack`, Argo CD project
+   `team-focustrack`, public URL `https://focustrack.cnh.radarhq.io`. The Radar
+   cluster id is looked up once in Radar and used on every Radar MCP call.
 3. A merge/push to `main` triggers `.github/workflows/image.yml` (`build-and-deploy`).
    Manual `workflow_dispatch` also works when run against `main`; other refs are
    skipped. Like the starter, pushes changing only Markdown and/or
@@ -117,16 +115,16 @@ Applications reconciling the same Deployment and Service.
 7. The manager confirms that the expected source SHA's action succeeded, the
    remote Kustomize tag matches it, the Application synced the expected bot/git
    revision, and the live Deployment uses that SHA image with ready Pods. Then
-   open `https://<team-name>.cnh.radarhq.io`, check `/healthz` and `/readyz`, and
+   open `https://focustrack.cnh.radarhq.io`, check `/healthz` and `/readyz`, and
    exercise the intended app feature. A green old Deployment does not prove the
    new code deployed. FocusTrack's health response deliberately has no version
    field; use the live image tag plus synced git revision to verify provenance.
 
 ## Manager handoff and validation
 
-Use Radar's cluster list to find the entry named exactly `<team-name>`; record its
+Use Radar's cluster list to find the entry named exactly `focustrack`; record its
 id as `<cluster-id>` and pass it as `cluster` on every subsequent Radar MCP call.
-Pass namespace `team-<team-name>` wherever supported. Never select the platform
+Pass namespace `team-focustrack` wherever supported. Never select the platform
 cluster `cnh` or another team's cluster. Keep all owned application changes in
 git; direct cluster edits will be undone by self-heal. No kubectl or Radar
 operations were performed by this worker.
@@ -172,9 +170,9 @@ start private; the person who starts it must present it or deliberately share it
 changing the app. Use these pages after replacing the placeholders:
 
 - Timeline: `https://app.radarhq.io/c/<cluster-id>/timeline`.
-- Application: `https://app.radarhq.io/c/<cluster-id>/resources/applications?resource=team-<team-name>/app-<team-name>&apiGroup=argoproj.io`.
-- Deployment/investigation target: `https://app.radarhq.io/c/<cluster-id>/resources/deployments?resource=team-<team-name>/app`.
-- Team Checks before and after: `https://app.radarhq.io/checks?scope=<cluster-id>&namespace=team-<team-name>`.
+- Application: `https://app.radarhq.io/c/<cluster-id>/resources/applications?resource=team-focustrack/app-focustrack&apiGroup=argoproj.io`.
+- Deployment/investigation target: `https://app.radarhq.io/c/<cluster-id>/resources/deployments?resource=team-focustrack/app`.
+- Team Checks before and after: `https://app.radarhq.io/checks?scope=<cluster-id>&namespace=team-focustrack`.
 - Hosted investigations: `https://app.radarhq.io/c/<cluster-id>/investigations`.
 
 ## If the cluster breaks
