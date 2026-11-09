@@ -59,13 +59,13 @@ spec:
             - name: DASH0_OTLP_ENDPOINT
               valueFrom:
                 secretKeyRef:
-                  name: app-credentials
+                  name: dash0-credentials
                   key: dash0-endpoint
                   optional: true
             - name: DASH0_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: app-credentials
+                  name: dash0-credentials
                   key: dash0-token
                   optional: true
           resources:

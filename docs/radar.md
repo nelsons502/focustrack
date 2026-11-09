@@ -286,8 +286,13 @@ invoke Vercel or change its settings.
 
 ## Dash0 runtime configuration
 
-The Deployment also reads `DASH0_OTLP_ENDPOINT` and `DASH0_AUTH_TOKEN` from
-`app-credentials` keys `dash0-endpoint` and `dash0-token`. These references are
-optional so missing telemetry configuration cannot prevent app startup. Server
+The Deployment also reads `DASH0_OTLP_ENDPOINT` and `DASH0_AUTH_TOKEN` from a
+separate Secret, `dash0-credentials`, keys `dash0-endpoint` and `dash0-token`.
+Nelson approved this separate Secret; `app-credentials` is retained solely for
+Elastic (`es-url` and `es-api-key`). Create `dash0-credentials` the same way as
+`app-credentials`: namespace `team-focustrack`, type `Opaque`, values entered
+under `stringData` in Radar Cloud. These references are optional so a missing
+Secret or key cannot prevent app startup. Server
 telemetry is supplied by the D observability PR; after that PR lands, it remains disabled until both values exist and the workload is restarted.
 The orchestrator or Nelson manages Secret values; they never belong in git.
+Argo CD leaves this manually created Secret alone.
