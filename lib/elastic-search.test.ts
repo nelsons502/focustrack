@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Session } from "./contract";
-import { GET as search } from "../app/api/search/route";
-import { GET as sessions } from "../app/api/sessions/route";
 
-const elastic = vi.hoisted(() => ({ search: vi.fn(), mget: vi.fn() }));
-vi.mock("./elastic", () => ({ createElasticClient: () => elastic }));
+const elastic = vi.hoisted(() => ({ search: vi.fn(), mget: vi.fn(), close: vi.fn() }));
+const createElasticClient = vi.hoisted(() => vi.fn());
+vi.mock("./elastic", () => ({ createElasticClient }));
+let search: typeof import("../app/api/search/route").GET;
+let sessions: typeof import("../app/api/sessions/route").GET;
 
 const session: Session = {
   id: "1", eventId: "kccncna2026", title: "Sample talk", description: "A short test excerpt.",
@@ -23,13 +24,47 @@ const filters = [
   { bool: { must_not: [{ terms: { restrictions: ["sold-out", "separate-registration", "all-access-pass"] } }] } },
 ];
 
-beforeEach(() => {
+beforeEach(async () => {
+  vi.resetModules();
   vi.resetAllMocks();
+  createElasticClient.mockReturnValue(elastic);
+  vi.spyOn(console, "warn").mockImplementation(() => {});
   elastic.search.mockResolvedValue(response);
   elastic.mget.mockResolvedValue({ docs: [] });
+  ({ GET: search } = await import("../app/api/search/route"));
+  ({ GET: sessions } = await import("../app/api/sessions/route"));
 });
 
+afterEach(() => vi.restoreAllMocks());
+
 describe("search API", () => {
+  it("shares one factory-created client across sequential search and mget requests", async () => {
+    const results = [
+      await search(request("/api/search?q=cluster")),
+      await sessions(request("/api/sessions?ids=1")),
+      await search(request("/api/search")),
+      await sessions(request("/api/sessions?ids=2")),
+    ];
+    expect(results.map((result) => result.status)).toEqual([200, 200, 200, 200]);
+    expect(createElasticClient).toHaveBeenCalledTimes(1);
+    expect(elastic.search).toHaveBeenCalledTimes(2);
+    expect(elastic.mget).toHaveBeenCalledTimes(2);
+    expect(elastic.close).not.toHaveBeenCalled();
+  });
+
+  it("warns once with only a coarse event when semantic search fails", async () => {
+    const privateQuery = "private-search-text";
+    const upstreamDetail = "private upstream detail https://upstream.example Authorization: Bearer secret-token";
+    elastic.search.mockRejectedValueOnce(new Error(upstreamDetail));
+    const result = await search(request(`/api/search?q=${privateQuery}`));
+    expect((await result.json()).mode).toBe("lexical-fallback");
+    expect(console.warn).toHaveBeenCalledTimes(1);
+    const warning = JSON.stringify(vi.mocked(console.warn).mock.calls);
+    expect(warning).not.toContain(privateQuery);
+    expect(warning).not.toContain(upstreamDetail);
+    expect(vi.mocked(console.warn).mock.calls).toEqual([[{ event: "search_lexical_fallback" }]]);
+  });
+
   it("runs RRF with identical filters in both branches and returns only Session fields", async () => {
     const result = await search(request("/api/search?q=cluster&day=2026-11-10&excludeRestricted=true"));
     expect(result.status).toBe(200);

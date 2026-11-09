@@ -2,6 +2,12 @@ import type { Client, estypes } from "@elastic/elasticsearch";
 import { INDEX_NAME, type SearchResponse, type Session } from "./contract";
 import { createElasticClient } from "./elastic";
 
+let cachedClient: Client | undefined;
+
+function getElasticClient(): Client {
+  return cachedClient ??= createElasticClient();
+}
+
 const SESSION_FIELDS = [
   "id", "eventId", "title", "description", "speakers", "startsAt", "endsAt",
   "day", "room", "venue", "level", "roomType", "kind", "restrictions",
@@ -67,7 +73,7 @@ export async function searchSessions(params: URLSearchParams): Promise<SearchRes
     _source: [...SESSION_FIELDS],
     allow_partial_search_results: false,
   };
-  const client = createElasticClient();
+  const client = getElasticClient();
   if (q) {
     try {
       const result = await client.search<Session>({
@@ -82,6 +88,7 @@ export async function searchSessions(params: URLSearchParams): Promise<SearchRes
       }, { requestTimeout: 10_000 });
       return { results: requireComplete(result), mode: "hybrid", tookMs: elapsed(started) };
     } catch {
+      console.warn({ event: "search_lexical_fallback" });
       return lexicalSearch(client, common, query, started);
     }
   }
@@ -110,7 +117,7 @@ export async function getSessionsByIds(params: URLSearchParams): Promise<Session
     throw new ApiInputError("Provide up to 50 valid session IDs separated by commas.");
   }
   const ids = [...new Set(requested)];
-  const result = await createElasticClient().mget<Session>({
+  const result = await getElasticClient().mget<Session>({
     index: INDEX_NAME, ids, _source: [...SESSION_FIELDS],
   }, { requestTimeout: 5_000 });
   const found = new Map<string, Session>();
