@@ -86,6 +86,8 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   const [retryToken, setRetryToken] = useState(0);
   const [reflectTick, setReflectTick] = useState(0);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const restoreNotesFocus = useRef(false);
   const noteInputRef = useRef<HTMLTextAreaElement>(null);
   const doneRef = useRef<HTMLButtonElement>(null);
   const skipButtonRef = useRef<HTMLButtonElement>(null);
@@ -218,12 +220,17 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
 
   function closeNotes() {
     flushDraft();
+    restoreNotesFocus.current = true;
     setSheetOpen(false);
-    toggleRef.current?.focus();
   }
 
   useEffect(() => {
-    if (sheetVisible) noteInputRef.current?.focus();
+    if (sheetVisible) {
+      noteInputRef.current?.focus();
+    } else if (restoreNotesFocus.current) {
+      restoreNotesFocus.current = false;
+      (toggleRef.current ?? mainRef.current)?.focus();
+    }
   }, [sheetVisible]);
 
   useEffect(() => {
@@ -318,7 +325,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
 
   return (
     <div className="now-page">
-      <main id="main" tabIndex={-1} className="now-shell">
+      <main ref={mainRef} id="main" tabIndex={-1} className="now-shell">
         <header className="now-head">
           <p className="app-name">FocusTrack</p>
           <PrimaryNav current="now" nowParam={nowParam} />

@@ -409,3 +409,16 @@ describe("NowScreen", () => {
     expect(window.sessionStorage.getItem("focustrack:now-opt-out")).toBe("1");
   });
 });
+
+it.each(["Done", "Escape"])("returns focus to the main content after a talk ends and Notes closes with %s", async (action) => {
+  seedPlan(["cur"]);
+  mockSessions([current]);
+  const view = render(<NowScreen nowParam="2026-11-10T11:25-07:00" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Notes" }));
+  fireEvent.change(screen.getByLabelText(/Write freely/), { target: { value: "final thought" } });
+  view.rerender(<NowScreen nowParam="2026-11-10T11:35-07:00" />);
+  if (action === "Done") fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  else fireEvent.keyDown(screen.getByLabelText(/Write freely/), { key: "Escape" });
+  expect(getLocalStateSnapshot().notes.cur.map((note) => note.text)).toEqual(["final thought"]);
+  await waitFor(() => expect(document.getElementById("main")).toHaveFocus());
+});
