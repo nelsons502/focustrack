@@ -34,6 +34,17 @@ describe("plan helpers", () => {
     expect(clamped.maxDailyHours).toBe(DEFAULT_ENERGY_SETTINGS.maxDailyHours);
   });
 
+  it("keeps the consecutive-session limit a whole number of sessions", () => {
+    expect(
+      clampEnergySettings({ ...DEFAULT_ENERGY_SETTINGS, maxConsecutive: 2.5 })
+        .maxConsecutive,
+    ).toBe(3);
+    expect(
+      clampEnergySettings({ ...DEFAULT_ENERGY_SETTINGS, maxConsecutive: 0.4 })
+        .maxConsecutive,
+    ).toBe(1);
+  });
+
   it("formats minute counts without needless decimals", () => {
     expect(formatMinutes(20)).toBe("20");
     expect(formatMinutes(5.5)).toBe("5.5");

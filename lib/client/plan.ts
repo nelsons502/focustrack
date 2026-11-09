@@ -27,7 +27,10 @@ function clampValue(key: NumericEnergyKey, value: number): number {
 
 export function clampEnergySettings(settings: EnergySettings): EnergySettings {
   return {
-    maxConsecutive: clampValue("maxConsecutive", settings.maxConsecutive),
+    maxConsecutive: clampValue(
+      "maxConsecutive",
+      Math.round(settings.maxConsecutive),
+    ),
     minBreakMinutes: clampValue("minBreakMinutes", settings.minBreakMinutes),
     transitionMinutes: clampValue(
       "transitionMinutes",
