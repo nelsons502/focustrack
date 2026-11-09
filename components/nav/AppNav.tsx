@@ -37,8 +37,11 @@ export default function AppNav() {
     const query = window.matchMedia("(min-width: 900px)");
     const onWide = (event: MediaQueryListEvent) => {
       if (event.matches) {
-        const destination = panelRef.current?.querySelector<HTMLElement>('[aria-current="page"]') ?? panelRef.current?.querySelector<HTMLElement>("a[href]");
-        destination?.focus();
+        const active = document.activeElement;
+        if (active === closeRef.current || active === menuRef.current || active === document.body) {
+          const destination = panelRef.current?.querySelector<HTMLElement>('[aria-current="page"]') ?? panelRef.current?.querySelector<HTMLElement>("a[href]");
+          destination?.focus();
+        }
         setOpen(false);
       }
     };
