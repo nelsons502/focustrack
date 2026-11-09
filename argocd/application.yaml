@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-<team-name>
+  namespace: team-<team-name>
+spec:
+  project: team-<team-name>
+  source:
+    repoURL: https://github.com/nelsons502/focustrack.git
+    targetRevision: main
+    path: deploy
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: team-<team-name>
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
