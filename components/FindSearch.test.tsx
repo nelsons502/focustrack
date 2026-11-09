@@ -51,10 +51,12 @@ function mockSearch(body: SearchResponse) {
 
 beforeEach(() => {
   window.localStorage.clear();
+  window.sessionStorage.clear();
   window.history.replaceState(null, "", "/");
 });
 
 afterEach(() => {
+  window.sessionStorage.clear();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -305,6 +307,257 @@ describe("FindSearch", () => {
     render(<FindSearch />);
     expect(await screen.findByText(/Demo time/)).toBeInTheDocument();
     expect(screen.getByText(/11:15\s?AM/)).toBeInTheDocument();
+  });
+
+  it("applies a day filter automatically after a short debounce without submit", async () => {
+    const fetchMock = mockSearch({
+      results: [makeSession()],
+      mode: "lexical-fallback",
+      tookMs: 1,
+    });
+    render(<FindSearch />);
+    await screen.findByRole("heading", {
+      name: "Kubernetes Basics Test Session",
+    });
+    const callsBefore = fetchMock.mock.calls.length;
+    fireEvent.change(screen.getByLabelText(/Day/), {
+      target: { value: "2026-11-09" },
+    });
+    expect(fetchMock.mock.calls.length).toBe(callsBefore);
+    await waitFor(
+      () => expect(fetchMock.mock.calls.length).toBe(callsBefore + 1),
+      { timeout: 2000 },
+    );
+    const url = String(fetchMock.mock.calls.at(-1)?.[0]);
+    expect(url).toContain("day=2026-11-09");
+  });
+
+  it("coalesces rapid filter changes into one debounced search", async () => {
+    const fetchMock = mockSearch({
+      results: [makeSession()],
+      mode: "lexical-fallback",
+      tookMs: 1,
+    });
+    render(<FindSearch />);
+    await screen.findByRole("heading", {
+      name: "Kubernetes Basics Test Session",
+    });
+    const callsBefore = fetchMock.mock.calls.length;
+    fireEvent.change(screen.getByLabelText(/Day/), {
+      target: { value: "2026-11-09" },
+    });
+    fireEvent.change(screen.getByLabelText(/Day/), {
+      target: { value: "2026-11-11" },
+    });
+    fireEvent.click(screen.getByRole("checkbox", { name: /restricted/i }));
+    await waitFor(
+      () => expect(fetchMock.mock.calls.length).toBe(callsBefore + 1),
+      { timeout: 2000 },
+    );
+    const url = String(fetchMock.mock.calls.at(-1)?.[0]);
+    expect(url).toContain("day=2026-11-11");
+    expect(url).toContain("excludeRestricted=true");
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    expect(fetchMock.mock.calls.length).toBe(callsBefore + 1);
+  });
+
+  it("does not search on query typing alone; the query needs Search", async () => {
+    const fetchMock = mockSearch({
+      results: [makeSession()],
+      mode: "lexical-fallback",
+      tookMs: 1,
+    });
+    render(<FindSearch />);
+    await screen.findByRole("heading", {
+      name: "Kubernetes Basics Test Session",
+    });
+    const callsBefore = fetchMock.mock.calls.length;
+    fireEvent.change(screen.getByLabelText(/Search sessions/), {
+      target: { value: "kubernetes" },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(fetchMock.mock.calls.length).toBe(callsBefore);
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.length).toBe(callsBefore + 1),
+    );
+    expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain("q=kubernetes");
+  });
+
+  it("persists query and filters and restores them on remount", async () => {
+    const fetchMock = mockSearch({
+      results: [makeSession()],
+      mode: "hybrid",
+      tookMs: 1,
+    });
+    const first = render(<FindSearch />);
+    await screen.findByRole("heading", {
+      name: "Kubernetes Basics Test Session",
+    });
+    fireEvent.change(screen.getByLabelText(/Search sessions/), {
+      target: { value: "platform" },
+    });
+    fireEvent.change(screen.getByLabelText(/Day/), {
+      target: { value: "2026-11-12" },
+    });
+    fireEvent.click(screen.getByRole("checkbox", { name: /restricted/i }));
+    await waitFor(
+      () =>
+        expect(
+          window.sessionStorage.getItem("focustrack:find:v1"),
+        ).toContain("2026-11-12"),
+      { timeout: 2000 },
+    );
+    first.unmount();
+    const callsBefore = fetchMock.mock.calls.length;
+    render(<FindSearch />);
+    await screen.findByRole("heading", {
+      name: "Kubernetes Basics Test Session",
+    });
+    expect(screen.getByLabelText(/Search sessions/)).toHaveValue("platform");
+    expect(screen.getByLabelText(/Day/)).toHaveValue("2026-11-12");
+    expect(
+      screen.getByRole("checkbox", { name: /restricted/i }),
+    ).toBeChecked();
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.length).toBeGreaterThan(callsBefore),
+    );
+    const url = String(fetchMock.mock.calls.at(-1)?.[0]);
+    expect(url).toContain("q=platform");
+    expect(url).toContain("day=2026-11-12");
+    expect(url).toContain("excludeRestricted=true");
+  });
+
+  it("falls back to defaults when stored find state is corrupt", async () => {
+    window.sessionStorage.setItem("focustrack:find:v1", "{not json");
+    const fetchMock = mockSearch({
+      results: [makeSession()],
+      mode: "hybrid",
+      tookMs: 1,
+    });
+    render(<FindSearch />);
+    await screen.findByRole("heading", {
+      name: "Kubernetes Basics Test Session",
+    });
+    expect(screen.getByLabelText(/Day/)).toHaveValue("2026-11-10");
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("day=2026-11-10");
+  });
+
+  it("shows Showing N of M and reveals 30 more without refetching", async () => {
+    const many = Array.from({ length: 45 }, (_, i) =>
+      makeSession({ id: `s${i}`, title: `Paginated Session ${i}` }),
+    );
+    const fetchMock = mockSearch({
+      results: many,
+      mode: "lexical-fallback",
+      tookMs: 1,
+    });
+    render(<FindSearch />);
+    expect(await screen.findByText("Showing 30 sessions")).toBeInTheDocument();
+    expect(screen.getAllByRole("status")[0]).toHaveTextContent(
+      /Showing 30 sessions/,
+    );
+    expect(
+      screen.queryByRole("heading", { name: "Paginated Session 44" }),
+    ).not.toBeInTheDocument();
+    const callsBefore = fetchMock.mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Show 30 more" }));
+    expect(await screen.findByText("Showing 45 sessions")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Paginated Session 44" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Show 30 more" }),
+    ).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.length).toBe(callsBefore);
+  });
+
+  it("announces the showing count through the live region for small sets", async () => {
+    mockSearch({
+      results: [makeSession(), makeSession({ id: "s2", title: "Second Session" })],
+      mode: "lexical-fallback",
+      tookMs: 1,
+    });
+    render(<FindSearch />);
+    await screen.findByRole("heading", { name: "Second Session" });
+    expect(screen.getByText("Showing 2 of 2 sessions")).toBeInTheDocument();
+    const statuses = screen.getAllByRole("status");
+    expect(statuses[0]).toHaveTextContent("Showing 2 of 2 sessions.");
+    expect(
+      screen.queryByRole("button", { name: "Show 30 more" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("uses the last submitted query, not the draft, when a filter changes", async () => {
+    const fetchMock = mockSearch({
+      results: [makeSession()],
+      mode: "lexical-fallback",
+      tookMs: 1,
+    });
+    render(<FindSearch />);
+    await screen.findByRole("heading", {
+      name: "Kubernetes Basics Test Session",
+    });
+    fireEvent.change(screen.getByLabelText(/Search sessions/), {
+      target: { value: "kubernetes" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() =>
+      expect(
+        String(fetchMock.mock.calls.at(-1)?.[0]),
+      ).toContain("q=kubernetes"),
+    );
+    fireEvent.change(screen.getByLabelText(/Search sessions/), {
+      target: { value: "unsubmitted draft" },
+    });
+    const callsBefore = fetchMock.mock.calls.length;
+    fireEvent.click(screen.getByRole("checkbox", { name: /restricted/i }));
+    await waitFor(
+      () => expect(fetchMock.mock.calls.length).toBe(callsBefore + 1),
+      { timeout: 2000 },
+    );
+    const url = String(fetchMock.mock.calls.at(-1)?.[0]);
+    expect(url).toContain("q=kubernetes");
+    expect(url).not.toContain("unsubmitted");
+    expect(url).toContain("excludeRestricted=true");
+  });
+
+  it("does not claim a total when the API returns a full page of results", async () => {
+    const many = Array.from({ length: 30 }, (_, i) =>
+      makeSession({ id: `s${i}`, title: `Capped Session ${i}` }),
+    );
+    mockSearch({ results: many, mode: "lexical-fallback", tookMs: 1 });
+    render(<FindSearch />);
+    expect(await screen.findByText("Showing 30 sessions")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Showing 30 of 30 sessions"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Show 30 more" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("moves focus to the first newly revealed result when showing more", async () => {
+    const many = Array.from({ length: 75 }, (_, i) =>
+      makeSession({ id: `s${i}`, title: `Focus Session ${i}` }),
+    );
+    mockSearch({ results: many, mode: "lexical-fallback", tookMs: 1 });
+    render(<FindSearch />);
+    await screen.findByRole("heading", { name: "Focus Session 0" });
+    const showMore = screen.getByRole("button", { name: "Show 30 more" });
+    showMore.focus();
+    fireEvent.click(showMore);
+    await screen.findByRole("heading", { name: "Focus Session 44" });
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement?.textContent).toContain("Focus Session 30");
+    const showMoreAgain = screen.getByRole("button", {
+      name: "Show 30 more",
+    });
+    showMoreAgain.focus();
+    fireEvent.click(showMoreAgain);
+    await screen.findByRole("heading", { name: "Focus Session 74" });
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement?.textContent).toContain("Focus Session 60");
   });
 
   it("ignores a stale response that arrives after a newer search", async () => {
