@@ -230,7 +230,8 @@ and `/healthz` returned 200; `/readyz` returned 503 without credentials. The
 container was removed afterward. No image pull, credential use, or host `/tmp`
 write was needed. This validates runtime compatibility; it does not replace
 verification of Kubernetes volume ownership or the exact Alpine production image.
-Dockerfile is unchanged. Hardening remains uncommitted and has not rolled out.
+Dockerfile is unchanged. Hardening is committed and reviewed in PR #15;
+the deployed Alpine image and Kubernetes volume permissions still need live verification.
 
 ## Radar story — evidence and pending verification
 
@@ -245,8 +246,8 @@ namespace `team-focustrack`; this worker did not query Radar or the cluster.
 | 12:54 hybrid live | A real Tuesday query returned 30 real results with mode `hybrid`. Search rollout was healthy: 2/2 ready, zero restarts. | Live feature evidence supplied by orchestrator |
 | Before hardening | CPU 6–7m and memory 47 MiB per Pod versus requests 100m/128 MiB. Four medium Checks: no read-only root, no disruption budget, no topology spread, and orphan `app-code` ConfigMap. | Real baseline; before screenshot capture not confirmed here |
 | 12:56 decision | Approve read-only root with writable temporary/cache volumes, a minimum-one disruption budget, soft node spreading, and requests 25m/96 MiB with existing limits. | Prepared in git; rollout and after Checks pending |
-| AI investigation | Hosted investigation linked below was still running at handoff. | Findings incomplete; no all-clear claimed |
-| After hardening | Orchestrator must verify the deployed revision, readiness, restarts, resource use, and Checks using the same namespace filter. | Pending manager review, Muse critic, authorized release, and live verification |
+| AI investigation, completed 12:57 | Radar found 2/2 replicas healthy, no active issues, and a missing disruption budget. It attributed the isolated startup warning to a rollout-time race. | Point-in-time assessment; PDB included in PR #15; no sustained-health guarantee |
+| After hardening | Orchestrator must verify the deployed revision, readiness, restarts, resource use, and Checks using the same namespace filter. | Reviewed; release and live verification pending |
 
 **Decision Radar helped us make.** Checks exposed missing filesystem and
 availability safeguards, while live usage showed room to reduce resource
@@ -267,7 +268,7 @@ evidence before acting.
 - Deployment/investigation target: `https://app.radarhq.io/c/uRdEIEL90Yk/resources/deployments?resource=team-focustrack/app`.
 - Team Checks before and after: `https://app.radarhq.io/checks?scope=uRdEIEL90Yk&namespace=team-focustrack`.
 - Hosted investigations: `https://app.radarhq.io/c/uRdEIEL90Yk/investigations`.
-- Running investigation: `https://app.radarhq.io/c/uRdEIEL90Yk/investigations/chat_ie6DbFJiQMGlhJN_?org=org_NCJbssDGEBsU`.
+- Completed investigation: `https://app.radarhq.io/c/uRdEIEL90Yk/investigations/chat_ie6DbFJiQMGlhJN_?org=org_NCJbssDGEBsU`.
 
 ## If the cluster breaks
 
