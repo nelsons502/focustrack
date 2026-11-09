@@ -1,5 +1,12 @@
+"use client";
+
+import { useId, useState } from "react";
 import type { Restriction, Session, SessionKind } from "../lib/contract";
-import { ACCESSIBILITY_SOURCE_URL } from "../lib/event";
+import {
+  ACCESSIBILITY_FACTS,
+  ACCESSIBILITY_SOURCE_LABEL,
+  ACCESSIBILITY_SOURCE_URL,
+} from "../lib/event";
 import { formatEventRange } from "../lib/client/time";
 
 const RESTRICTION_LABELS: Record<Restriction, string> = {
@@ -20,6 +27,30 @@ const KIND_LABELS: Record<SessionKind, string> = {
   logistics: "Logistics",
 };
 
+const CROWD_LABELS: Record<Session["crowdEstimate"], string> = {
+  large: "likely large",
+  moderate: "likely moderate",
+  unknown: "unknown",
+};
+
+const NOISE_LABELS: Record<Session["noiseEstimate"], string> = {
+  loud: "likely loud",
+  unknown: "unknown",
+};
+
+const LONG_DESCRIPTION = 140;
+
+function estimateText(
+  name: string,
+  label: string,
+  estimate: string,
+  basis: string,
+): string {
+  const trimmed = basis.trim();
+  if (estimate === "unknown" || !trimmed) return `${name}: ${label}`;
+  return `${name}: ${label} (estimate: ${trimmed})`;
+}
+
 type SessionCardProps = {
   session: Session;
   inPlan: boolean;
@@ -34,12 +65,21 @@ export default function SessionCard({
   const place = [session.room, session.level, session.venue]
     .filter((part): part is string => Boolean(part && part.trim()))
     .join(" · ");
-  const crowd = session.crowdBasis.trim()
-    ? `Crowd estimate: ${session.crowdEstimate}, based on ${session.crowdBasis.trim()}`
-    : `Crowd estimate: ${session.crowdEstimate}`;
-  const noise = session.noiseBasis.trim()
-    ? `Noise estimate: ${session.noiseEstimate}, based on ${session.noiseBasis.trim()}`
-    : `Noise estimate: ${session.noiseEstimate}`;
+  const [expanded, setExpanded] = useState(false);
+  const descId = useId();
+  const description = session.description.trim();
+  const crowd = estimateText(
+    "Crowd",
+    CROWD_LABELS[session.crowdEstimate],
+    session.crowdEstimate,
+    session.crowdBasis,
+  );
+  const noise = estimateText(
+    "Noise",
+    NOISE_LABELS[session.noiseEstimate],
+    session.noiseEstimate,
+    session.noiseBasis,
+  );
   return (
     <article className="card">
       <div className="card-head">
@@ -70,32 +110,62 @@ export default function SessionCard({
             .join(", ")}
         </p>
       ) : null}
-      {session.description.trim() ? (
-        <p className="card-desc">{session.description.trim()}</p>
+      {description ? (
+        <>
+          <p
+            id={descId}
+            className={expanded ? "card-desc" : "card-desc card-desc-clamped"}
+          >
+            {description}
+          </p>
+          {description.length > LONG_DESCRIPTION ? (
+            <button
+              type="button"
+              className="button button-quiet"
+              aria-expanded={expanded}
+              aria-controls={descId}
+              onClick={() => setExpanded((value) => !value)}
+            >
+              {expanded ? "Hide full description" : "Show full description"}
+            </button>
+          ) : null}
+        </>
       ) : null}
       <ul className="card-facts">
         <li>{crowd}</li>
         <li>{noise}</li>
-        {session.captions === "wordly-breakout" ? (
-          <li>
-            Captions: Wordly live captions for breakout sessions.{" "}
-            <a href={ACCESSIBILITY_SOURCE_URL}>Official accessibility information</a>
-          </li>
-        ) : null}
+        <li>
+          {session.captions === "wordly-breakout"
+            ? ACCESSIBILITY_FACTS.captionsWordly
+            : ACCESSIBILITY_FACTS.captionsUnconfirmed}
+        </li>
+        <li>{ACCESSIBILITY_FACTS.seating}</li>
+        <li>{ACCESSIBILITY_FACTS.nearestQuietRoom}</li>
       </ul>
+      <details className="card-details">
+        <summary>About quiet rooms</summary>
+        <p>{ACCESSIBILITY_FACTS.quietRoomAbout}</p>
+      </details>
+      <p className="card-source">
+        Source:{" "}
+        <a href={ACCESSIBILITY_SOURCE_URL}>{ACCESSIBILITY_SOURCE_LABEL}</a>
+      </p>
       <div className="card-actions">
         <button
           type="button"
           className={inPlan ? "button button-saved" : "button button-add"}
-          aria-label={
-            inPlan
-              ? `In your plan — remove: ${session.title}`
-              : `Add to plan: ${session.title}`
-          }
+          aria-pressed={inPlan}
           onClick={() => onTogglePlan(session)}
         >
-          {inPlan ? "In your plan — remove" : "Add to plan"}
+          {inPlan ? <span aria-hidden="true">✓ </span> : null}
+          Add to plan
+          <span className="visually-hidden">: {session.title}</span>
         </button>
+        {inPlan ? (
+          <span className="plan-state" aria-hidden="true">
+            In your plan
+          </span>
+        ) : null}
         {session.sourceUrl ? (
           <a className="card-link" href={session.sourceUrl}>
             Session source
