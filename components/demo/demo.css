@@ -15,6 +15,34 @@
   box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 35%);
 }
 
+html:has(.demo-bar) {
+  --demo-bar-space: 10rem;
+  scroll-padding-bottom: var(--demo-bar-space);
+}
+
+body:has(.demo-bar) {
+  padding-bottom: var(--demo-bar-space);
+}
+
+@media (max-width: 41.99rem) {
+  html:has(.demo-bar) {
+    --demo-bar-space: clamp(10rem, calc(40vh + 1.5rem), 22rem);
+  }
+
+  .demo-bar {
+    max-height: calc(var(--demo-bar-space) - 0.75rem);
+    overflow-y: auto;
+  }
+}
+
+@supports (height: 100dvh) {
+  @media (max-width: 41.99rem) {
+    html:has(.demo-bar) {
+      --demo-bar-space: clamp(10rem, calc(40dvh + 1.5rem), 22rem);
+    }
+  }
+}
+
 .demo-bar-time {
   margin: 0;
   font-size: 0.95rem;

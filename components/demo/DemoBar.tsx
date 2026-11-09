@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import "./demo.css";
 import {
   getSimClock,
@@ -17,11 +18,16 @@ const SPEEDS: readonly number[] = [1, 60, 300];
 
 export default function DemoBar() {
   const now = useNow(1000);
+  const [sim, setSim] = useState(() => getSimClock());
+  useEffect(() => {
+    const update = () => setSim(getSimClock());
+    update();
+    window.addEventListener("focustrack:clock", update);
+    return () => window.removeEventListener("focustrack:clock", update);
+  }, []);
   // Epoch is the pre-hydration placeholder from useNow; render nothing until
   // the real (possibly simulated) time is known on the client.
-  if (now.getTime() === 0) return null;
-  const sim = getSimClock();
-  if (!sim) return null;
+  if (now.getTime() === 0 || !sim) return null;
 
   const next = nextDemoMoment(now.getTime());
 

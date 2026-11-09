@@ -1,12 +1,14 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import ReflectPage from "../../app/reflect/page";
+import { NOW_OPT_OUT_KEY } from "../now/now-helpers";
 import PrimaryNav from "./PrimaryNav";
 
 const NOW = "2026-11-10T11:00-07:00";
 
 beforeEach(() => {
   localStorage.clear();
+  window.sessionStorage.clear();
   window.history.pushState({}, "", "/");
 });
 
@@ -42,6 +44,14 @@ describe("PrimaryNav", () => {
       "href",
       `/plan?now=${encodeURIComponent(NOW)}`,
     );
+  });
+
+  it("opts out of Now takeover when Find is clicked", () => {
+    render(<PrimaryNav current="now" />);
+    const findLink = screen.getByRole("link", { name: "Find" });
+    findLink.addEventListener("click", (event) => event.preventDefault());
+    fireEvent.click(findLink);
+    expect(window.sessionStorage.getItem(NOW_OPT_OUT_KEY)).toBe("1");
   });
 });
 

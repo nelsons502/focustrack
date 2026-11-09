@@ -6,7 +6,11 @@ import {
   loadLocalState,
   updateLocalState,
 } from "../client/local-state";
-import { QUIET_ROOM_260A, type LocalState } from "../contract";
+import {
+  NOW_OPT_OUT_KEY,
+  QUIET_ROOM_260A,
+  type LocalState,
+} from "../contract";
 import {
   applyMayaPlan,
   MAYA_BREAK,
@@ -15,7 +19,6 @@ import {
   MAYA_SESSION_IDS,
   MAYA_SESSION_TIMES,
   nextDemoMoment,
-  NOW_OPT_OUT_KEY,
   startMayaDemo,
 } from "./maya";
 

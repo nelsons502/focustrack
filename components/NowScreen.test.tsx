@@ -61,6 +61,7 @@ function seedPlan(ids: string[]) {
 
 beforeEach(() => {
   window.localStorage.clear();
+  window.sessionStorage.clear();
   updateLocalState(createDefaultLocalState());
 });
 
@@ -117,34 +118,31 @@ describe("NowScreen", () => {
     expect(await screen.findByText("Happening now")).toBeInTheDocument();
   });
 
-  it("keeps notes collapsed, saves lines, undoes the last, and returns focus", async () => {
+  it("keeps notes collapsed, autosaves the notepad after a pause, and returns focus", async () => {
     seedPlan(["cur"]);
     mockSessions([current]);
     render(<NowScreen nowParam={DEMO} />);
     const toggle = await screen.findByRole("button", { name: "Quick notes" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByLabelText(/One line/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Write freely/)).not.toBeInTheDocument();
 
     fireEvent.click(toggle);
-    const input = screen.getByLabelText(/One line/);
+    const input = screen.getByLabelText(/Write freely/);
     await waitFor(() => expect(input).toHaveFocus());
-    fireEvent.change(input, { target: { value: "ask about etcd" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
-    fireEvent.change(input, { target: { value: "second thought" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
-    expect(getLocalStateSnapshot().notes.cur.map((n) => n.text)).toEqual([
-      "ask about etcd",
-      "second thought",
-    ]);
-    expect(JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY) ?? "{}").notes.cur).toHaveLength(2);
-    expect(screen.getByRole("status")).toHaveTextContent("Note saved");
+    fireEvent.change(input, { target: { value: "ask about etcd\nsecond thought" } });
+    expect(getLocalStateSnapshot().notes.cur).toBeUndefined();
+    await waitFor(
+      () =>
+        expect(getLocalStateSnapshot().notes.cur?.map((n) => n.text)).toEqual([
+          "ask about etcd\nsecond thought",
+        ]),
+      { timeout: 3000 },
+    );
+    expect(JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY) ?? "{}").notes.cur).toHaveLength(1);
+    expect(screen.getByRole("status")).toHaveTextContent("Saved");
 
-    fireEvent.click(screen.getByRole("button", { name: "Undo last note" }));
-    expect(getLocalStateSnapshot().notes.cur.map((n) => n.text)).toEqual(["ask about etcd"]);
-    expect(screen.getByRole("status")).toHaveTextContent("Last note removed");
-
-    fireEvent.keyDown(screen.getByLabelText(/One line/), { key: "Escape" });
-    expect(screen.queryByLabelText(/One line/)).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByLabelText(/Write freely/), { key: "Escape" });
+    expect(screen.queryByLabelText(/Write freely/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Quick notes" })).toHaveFocus();
   });
 
@@ -164,7 +162,7 @@ describe("NowScreen", () => {
     mockSessions([current]);
     render(<NowScreen nowParam={DEMO} />);
     fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
-    fireEvent.change(screen.getByLabelText(/One line/), {
+    fireEvent.change(screen.getByLabelText(/Write freely/), {
       target: { value: "follow up on tracing" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Close notes" }));
@@ -179,7 +177,7 @@ describe("NowScreen", () => {
     mockSessions([current, next]);
     const { rerender } = render(<NowScreen nowParam={DEMO} />);
     fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
-    fireEvent.change(screen.getByLabelText(/One line/), {
+    fireEvent.change(screen.getByLabelText(/Write freely/), {
       target: { value: "ask about the next session" },
     });
 
@@ -187,14 +185,14 @@ describe("NowScreen", () => {
 
     expect(await screen.findByText("Session nxt")).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Notes for Session cur" })).toBeInTheDocument();
-    expect(screen.getByLabelText(/One line/)).toHaveValue("ask about the next session");
-    expect(screen.getByLabelText(/One line/)).toHaveFocus();
+    expect(screen.getByLabelText(/Write freely/)).toHaveValue("ask about the next session");
+    expect(screen.getByLabelText(/Write freely/)).toHaveFocus();
     fireEvent.click(screen.getByRole("button", { name: "Close notes" }));
     expect(getLocalStateSnapshot().notes.cur.map((note) => note.text)).toEqual([
       "ask about the next session",
     ]);
     expect(getLocalStateSnapshot().notes.nxt).toBeUndefined();
-    expect(screen.queryByLabelText(/One line/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Write freely/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Quick notes" })).toHaveFocus();
   });
 
@@ -211,17 +209,17 @@ describe("NowScreen", () => {
     mockSessions([current]);
     const view = render(<NowScreen nowParam="2026-11-10T11:25-07:00" />);
     fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
-    fireEvent.change(screen.getByLabelText(/One line/), { target: { value: "last thought" } });
+    fireEvent.change(screen.getByLabelText(/Write freely/), { target: { value: "last thought" } });
     view.rerender(<NowScreen nowParam="2026-11-10T11:35-07:00" />);
     expect(screen.queryByText("Happening now")).not.toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Notes for Session cur" })).toBeInTheDocument();
-    expect(screen.getByLabelText(/One line/)).toHaveValue("last thought");
+    expect(screen.getByLabelText(/Write freely/)).toHaveValue("last thought");
     fireEvent.click(screen.getByRole("button", { name: "Close notes" }));
     expect(getLocalStateSnapshot().notes.cur.map((n) => n.text)).toEqual(["last thought"]);
     expect(screen.queryByRole("button", { name: "Quick notes" })).not.toBeInTheDocument();
   });
 
-  it("undoes the note that was saved, not one on the new current session", async () => {
+  it("flushes a pending draft to its own session, not the new current session", async () => {
     const a = makeSession("a", "10:30", "11:30");
     const b = makeSession("b", "11:30", "12:30");
     const state = createDefaultLocalState();
@@ -231,31 +229,102 @@ describe("NowScreen", () => {
     mockSessions([a, b]);
     const view = render(<NowScreen nowParam="2026-11-10T11:25-07:00" />);
     fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
-    fireEvent.change(screen.getByLabelText(/One line/), { target: { value: "a note" } });
+    fireEvent.change(screen.getByLabelText(/Write freely/), { target: { value: "a note" } });
     view.rerender(<NowScreen nowParam="2026-11-10T11:31-07:00" />);
     expect(screen.getByRole("group", { name: "Notes for Session a" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
-    expect(getLocalStateSnapshot().notes.a.map((n) => n.text)).toEqual(["a note"]);
-    fireEvent.click(screen.getByRole("button", { name: "Undo last note" }));
-    expect(getLocalStateSnapshot().notes.a).toEqual([]);
-    expect(getLocalStateSnapshot().notes.b.map((n) => n.text)).toEqual(["b note"]);
-  });
-
-  it("disables undo when opening notes for a different session", async () => {
-    const a = makeSession("a", "10:30", "11:30");
-    const b = makeSession("b", "11:30", "12:30");
-    seedPlan(["a", "b"]);
-    mockSessions([a, b]);
-    const view = render(<NowScreen nowParam="2026-11-10T11:25-07:00" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
-    fireEvent.change(screen.getByLabelText(/One line/), { target: { value: "a note" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
     fireEvent.click(screen.getByRole("button", { name: "Close notes" }));
-    view.rerender(<NowScreen nowParam="2026-11-10T11:31-07:00" />);
+    expect(getLocalStateSnapshot().notes.a.map((n) => n.text)).toEqual(["a note"]);
+    expect(getLocalStateSnapshot().notes.b.map((n) => n.text)).toEqual(["b note"]);
 
     fireEvent.click(screen.getByRole("button", { name: "Quick notes" }));
     expect(screen.getByRole("group", { name: "Notes for Session b" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Undo last note" })).toBeDisabled();
+    expect(screen.getByLabelText(/Write freely/)).toHaveValue("b note");
     expect(getLocalStateSnapshot().notes.a.map((note) => note.text)).toEqual(["a note"]);
+  });
+
+  it("migrates old note entries into the notepad and persists clearing it", async () => {
+    const state = createDefaultLocalState();
+    state.plan.sessionIds = ["cur"];
+    state.notes.cur = [
+      { text: "first line", at: "2026-11-10T17:00:00.000Z" },
+      { text: "second line", at: "2026-11-10T17:05:00.000Z" },
+    ];
+    updateLocalState(state);
+    mockSessions([current]);
+    render(<NowScreen nowParam={DEMO} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
+    expect(screen.getByLabelText(/Write freely/)).toHaveValue("first line\nsecond line");
+    fireEvent.change(screen.getByLabelText(/Write freely/), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Close notes" }));
+    expect(getLocalStateSnapshot().notes.cur).toEqual([]);
+    fireEvent.click(screen.getByRole("button", { name: "Quick notes" }));
+    expect(screen.getByLabelText(/Write freely/)).toHaveValue("");
+  });
+
+  it("shows a planned break as the current item with its room and end", async () => {
+    const state = createDefaultLocalState();
+    state.plan.sessionIds = ["cur", "nxt"];
+    state.plan.breaks = [
+      {
+        id: "br1",
+        startsAt: "2026-11-10T11:30:00-07:00",
+        endsAt: "2026-11-10T11:50:00-07:00",
+        room: "Salt Palace, Level 2, 260A",
+      },
+    ];
+    updateLocalState(state);
+    mockSessions([current, next]);
+    render(<NowScreen nowParam="2026-11-10T11:40-07:00" />);
+    expect(await screen.findByText("On a break")).toBeInTheDocument();
+    expect(screen.getByText("Salt Palace, Level 2, 260A")).toBeInTheDocument();
+    expect(screen.getByText(/Ends at/)).toHaveTextContent("11:50");
+  });
+
+  it("shows a heads-up within 10 minutes with transition advice", async () => {
+    seedPlan(["cur", "nxt"]);
+    mockSessions([current, next]);
+    render(<NowScreen nowParam="2026-11-10T11:38-07:00" />);
+    expect(
+      await screen.findByText(/Next: Session nxt in 7 min · Room nxt · Level 3/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/level changes from Level 2 to Level 3/)).toBeInTheDocument();
+  });
+
+  it("offers reflect within 15 minutes after the last talk, dismissibly", async () => {
+    seedPlan(["cur"]);
+    mockSessions([current]);
+    render(<NowScreen nowParam="2026-11-10T11:40-07:00" />);
+    expect(await screen.findByText("Reflect on Session cur?")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Reflect on Session cur" })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/^\/reflect\?now=/),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByText("Reflect on Session cur?")).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem("focustrack:reflect-dismissed:cur")).toBe("1");
+  });
+
+  it("flushes a pending draft on unmount", async () => {
+    seedPlan(["cur"]);
+    mockSessions([current]);
+    const view = render(<NowScreen nowParam={DEMO} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
+    fireEvent.change(screen.getByLabelText(/Write freely/), {
+      target: { value: "typed just before leaving" },
+    });
+    view.unmount();
+    expect(getLocalStateSnapshot().notes.cur.map((n) => n.text)).toEqual([
+      "typed just before leaving",
+    ]);
+  });
+
+  it("sets the session opt-out from Browse talks instead", async () => {
+    seedPlan(["cur"]);
+    mockSessions([current]);
+    render(<NowScreen nowParam={DEMO} />);
+    const link = await screen.findByRole("link", { name: "Browse talks instead" });
+    expect(link).toHaveAttribute("href", expect.stringMatching(/^\/\?now=/));
+    fireEvent.click(link);
+    expect(window.sessionStorage.getItem("focustrack:now-opt-out")).toBe("1");
   });
 });
