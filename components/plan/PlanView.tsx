@@ -1,5 +1,6 @@
 "use client";
 
+import "./plan.css";
 import Link from "next/link";
 import { EVENT_TIME_ZONE } from "../../lib/contract";
 import {
@@ -29,10 +30,12 @@ import {
   formatMinutes,
   hasRealBreakGap,
 } from "../../lib/client/plan";
+import { useNow } from "../../lib/client/clock";
 import { fetchSessionsByIds } from "../../lib/client/sessions-api";
 import {
   formatEventDayLabel,
   formatEventRange,
+  formatEventTime,
   getEventDayKey,
 } from "../../lib/client/time";
 import { checkEnergy } from "../../lib/energy";
@@ -76,6 +79,7 @@ function gapText(previous: TimelineEntry, next: TimelineEntry): string | null {
 }
 
 export default function PlanView() {
+  const now = useNow(30_000);
   const localState = useSyncExternalStore(
     subscribeLocalState,
     getLocalStateSnapshot,
@@ -205,6 +209,16 @@ export default function PlanView() {
         a.kind.localeCompare(b.kind),
     );
   }, [daySessions, dayBreaks]);
+  const clockReady = now.getTime() !== 0;
+  const isSelectedToday =
+    clockReady &&
+    selectedDay !== null &&
+    getEventDayKey(now.toISOString()) === selectedDay;
+  const nowMs = now.getTime();
+  const nextEntry = isSelectedToday
+    ? (timelineEntries.find((entry) => Date.parse(entry.startsAt) > nowMs) ?? null)
+    : null;
+
   const settings = useMemo(
     () => clampEnergySettings(localState.energy),
     [localState.energy],
@@ -356,6 +370,12 @@ export default function PlanView() {
         receives public session IDs to look up their times and rooms. Your notes, quiet-room breaks and settings
         are not sent.
       </p>
+      <p className="plan-settings-row">
+        <span>Energy limits and data on this device:</span>{" "}
+        <Link className="plan-settings-link" href="/settings">
+          Settings
+        </Link>
+      </p>
       <p className="status" role="status" aria-live="polite" aria-atomic="true">
         {statusText}
       </p>
@@ -440,10 +460,34 @@ export default function PlanView() {
             Times are shown in event time for Salt Lake City
             ({EVENT_TIME_ZONE}).
           </p>
+          {isSelectedToday ? (
+            <p className="plan-now-line">
+              It is currently {formatEventTime(now.toISOString())} (event
+              time). Your day is below, in order.
+            </p>
+          ) : null}
           <ol className="timeline">
             {timelineEntries.map((entry, index) => {
               const previous = timelineEntries[index - 1];
               const gap = previous ? gapText(previous, entry) : null;
+              const phase = !isSelectedToday
+                ? null
+                : nowMs >= Date.parse(entry.startsAt) &&
+                    nowMs < Date.parse(entry.endsAt)
+                  ? "current"
+                  : entry === nextEntry
+                    ? "next"
+                    : Date.parse(entry.endsAt) <= nowMs
+                      ? "past"
+                      : null;
+              const phaseLabel =
+                phase === "current"
+                  ? "Happening now"
+                  : phase === "next"
+                    ? "Up next"
+                    : phase === "past"
+                      ? "Finished earlier"
+                      : null;
               if (entry.kind === "break") {
                 const planBreak = entry.planBreak;
                 const range = formatEventRange(
@@ -453,7 +497,10 @@ export default function PlanView() {
                 const conflicts =
                   canIntervene && conflictingBreakIds.has(planBreak.id);
                 return (
-                  <li key={planBreak.id}>
+                  <li
+                    key={planBreak.id}
+                    className={`timeline-item timeline-item-break${phase ? ` timeline-item-${phase}` : ""}`}
+                  >
                     {gap ? <p className="timeline-gap">{gap}</p> : null}
                     {conflicts ? (
                       <p className="timeline-gap">
@@ -462,12 +509,23 @@ export default function PlanView() {
                         overlap.
                       </p>
                     ) : null}
-                    <article className="card card-break">
+                    <article
+                      className="card card-break"
+                      aria-current={phase === "current" ? "time" : undefined}
+                    >
+                      <p className="break-eyebrow">Rest break</p>
+                      {phaseLabel ? (
+                        <p className="timeline-phase">{phaseLabel}</p>
+                      ) : null}
                       <h3 className="card-title">Quiet-room break</h3>
                       <p className="card-time">
                         <time dateTime={planBreak.startsAt}>{range}</time>
                       </p>
                       <p className="card-place">{planBreak.room}</p>
+                      <p className="break-note">
+                        Time to rest in the quiet room.
+                        {!conflicts ? " No session is scheduled here." : null}
+                      </p>
                       <div className="card-actions">
                         <button
                           type="button"
@@ -487,9 +545,18 @@ export default function PlanView() {
                 .filter((part): part is string => Boolean(part && part.trim()))
                 .join(" · ");
               return (
-                <li key={session.id}>
+                <li
+                  key={session.id}
+                  className={`timeline-item timeline-item-session${phase ? ` timeline-item-${phase}` : ""}`}
+                >
                   {gap ? <p className="timeline-gap">{gap}</p> : null}
-                  <article className="card">
+                  <article
+                    className="card timeline-card"
+                    aria-current={phase === "current" ? "time" : undefined}
+                  >
+                    {phaseLabel ? (
+                      <p className="timeline-phase">{phaseLabel}</p>
+                    ) : null}
                     <h3 className="card-title">{session.title}</h3>
                     {session.restrictions.length > 0 ? (
                       <ul className="chips" aria-label="Session restrictions">

@@ -7,7 +7,7 @@ import {
 
 export default function PlanPage() {
   return (
-    <main id="main" tabIndex={-1} className="shell">
+    <main id="main" tabIndex={-1} className="shell plan-page">
       <header className="masthead">
         <p className="app-name">FocusTrack</p>
         <PrimaryNav current="plan" />

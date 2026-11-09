@@ -1,5 +1,6 @@
 "use client";
 
+import "./plan.css";
 import { useState } from "react";
 import { QUIET_ROOM_260A } from "../../lib/contract";
 import type {
@@ -175,7 +176,8 @@ export default function EnergyPanel({
   }
 
   return (
-    <section aria-labelledby="energy-heading" className="energy">
+    <section aria-labelledby="energy-heading" className="energy energy-card">
+      <p className="energy-eyebrow">How this day might feel</p>
       <h2 id="energy-heading" className="plan-heading">
         Energy check for {dayLabel}
       </h2>
@@ -198,6 +200,7 @@ export default function EnergyPanel({
       )}
       {canIntervene && dropSession ? (
         <div className="suggestion">
+          <p className="suggestion-label">One idea to try</p>
           <p>
             One option: drop “{dropSession.title}” to ease this day. You can
             add it back from Find any time.
@@ -214,6 +217,7 @@ export default function EnergyPanel({
       ) : null}
       {canIntervene && breakText ? (
         <div className="suggestion">
+          <p className="suggestion-label">One idea to try</p>
           <p>{breakText}</p>
           {breakCandidate ? (
             <button
