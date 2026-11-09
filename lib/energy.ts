@@ -23,6 +23,7 @@ export function checkEnergy(sessions: Session[], settings: EnergySettings): Ener
   let run: string[] = [];
   let busyEnd = -Infinity;
   let busyEndAt = '';
+  let busyOwner: Session | undefined;
   const daily = new Map<number, { start: number; end: number; sessionId: string }[]>();
 
   function finishRun() {
@@ -44,9 +45,9 @@ export function checkEnergy(sessions: Session[], settings: EnergySettings): Ener
     }
     run.push(session.id);
 
-    if (previous) {
-      const gapMinutes = (start - previous.end) / MINUTE;
-      const from = previous.session;
+    if (busyOwner && busyEnd <= start) {
+      const gapMinutes = (start - busyEnd) / MINUTE;
+      const from = busyOwner;
       const buildingChanged = Boolean(from.venue && session.venue && from.venue !== session.venue);
       const levelChanged = Boolean(from.level && session.level && from.level !== session.level);
       const neededMinutes = buildingChanged ? settings.buildingChangeMinutes
@@ -54,6 +55,8 @@ export function checkEnergy(sessions: Session[], settings: EnergySettings): Ener
       if (gapMinutes < neededMinutes) {
         warnings.push({ type: 'tight-transition', fromId: from.id, toId: session.id, gapMinutes, neededMinutes });
       }
+    }
+    if (previous) {
       if (!breakStart && sameDay && warnings.length && (start - busyEnd) / MINUTE >= settings.minBreakMinutes) {
         breakStart = busyEndAt;
       }
@@ -62,6 +65,7 @@ export function checkEnergy(sessions: Session[], settings: EnergySettings): Ener
     if (end > busyEnd) {
       busyEnd = end;
       busyEndAt = session.endsAt;
+      busyOwner = session;
     }
 
     if (settings.flagLoudRooms && session.noiseEstimate === 'loud') {

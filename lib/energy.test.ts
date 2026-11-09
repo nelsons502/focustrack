@@ -94,6 +94,34 @@ describe('checkEnergy', () => {
     ]);
   });
 
+  it.each([
+    [{}, {}, {}, 10],
+    [{}, { level: 'Level 2' }, { level: 'Level 2' }, 15],
+    [{}, { venue: 'Other', level: 'Level 2' }, { venue: 'Other', level: 'Level 2' }, 20],
+    [{ venue: null, level: null }, {}, { level: 'Level 2' }, 10],
+    [{}, {}, { venue: null, level: null }, 10],
+    [{ venue: null }, { level: 'Level 2' }, { level: 'Level 2' }, 15],
+  ])('checks transitions from the session owning the latest busy end (%j, %j, %j)', (owner, nested, next, needed) => {
+    expect(warnings([
+      session('a', '09:00', '12:00', owner),
+      session('b', '09:30', '10:00', nested),
+      session('c', '12:05', '13:00', next),
+    ], 'tight-transition')).toEqual([
+      { type: 'tight-transition', fromId: 'a', toId: 'c', gapMinutes: 5, neededMinutes: needed },
+    ]);
+  });
+
+  it('reports overlaps without duplicated negative transitions or transitions inside a busy interval', () => {
+    expect(checkEnergy([
+      session('a', '09:00', '12:00'),
+      session('b', '09:30', '10:00'),
+      session('c', '10:05', '11:00'),
+    ], DEFAULT_ENERGY_SETTINGS).warnings).toEqual([
+      { type: 'overlap', sessionIds: ['a', 'b'] },
+      { type: 'overlap', sessionIds: ['a', 'c'] },
+    ]);
+  });
+
   it('reports every genuine overlap, including sessions nested inside another', () => {
     expect(warnings([
       session('a', '09:00', '12:00'), session('b', '09:30', '10:00'), session('c', '10:30', '11:00'),
