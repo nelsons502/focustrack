@@ -19,11 +19,13 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        <ThemeInit />
+      </head>
       <body>
         <a className="skip-link" href="#main">
           Skip to main content
         </a>
-        <ThemeInit />
         <div className="app-shell">
           <AppNav />
           <div className="app-content">{children}</div>

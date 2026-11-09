@@ -43,14 +43,12 @@ describe("SettingsLink", () => {
 });
 
 describe("ThemeInit", () => {
-  it("applies a stored explicit theme on mount and leaves system unset", () => {
-    localStorage.setItem("focustrack:theme", "dark");
-    const { unmount } = render(<ThemeInit />);
-    expect(document.documentElement.dataset.theme).toBe("dark");
-    unmount();
-    delete document.documentElement.dataset.theme;
-    localStorage.setItem("focustrack:theme", "system");
-    render(<ThemeInit />);
-    expect(document.documentElement.dataset.theme).toBeUndefined();
+  it("renders a pre-paint bootstrap script", () => {
+    const { container } = render(<ThemeInit />);
+    const script = container.querySelector("script");
+
+    expect(script).not.toBeNull();
+    expect(script?.textContent).toContain('localStorage.getItem("focustrack:theme")');
+    expect(script?.textContent).toContain("document.documentElement.dataset.theme=choice");
   });
 });
