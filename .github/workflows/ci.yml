@@ -21,9 +21,9 @@ jobs:
       - if: steps.app.outputs.present == 'true'
         run: npm ci
       - if: steps.app.outputs.present == 'true'
-        run: npm run typecheck --if-present
+        run: npm run typecheck
       - if: steps.app.outputs.present == 'true'
-        run: npm run lint --if-present
+        run: npm run lint
       - if: steps.app.outputs.present == 'true'
         run: npm test --if-present
       - if: steps.app.outputs.present == 'true'

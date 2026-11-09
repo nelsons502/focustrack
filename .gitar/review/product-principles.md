@@ -5,11 +5,18 @@
 - Each screen has one obvious primary action and a clear done state.
 
 ## Accessibility (this app serves neurodivergent, Deaf and hard-of-hearing attendees)
-- Every interactive element is keyboard reachable with a visible focus style, and has an accessible name.
-- Never convey meaning by color alone; crowd, noise and caption indicators need text or icon labels.
-- Respect `prefers-reduced-motion`. Maintain WCAG AA contrast.
+- Every interactive element is keyboard reachable, has an accessible name, and a visible focus style that is never obscured by sticky headers or drawers.
+- Touch targets are at least 44 by 44 CSS pixels. Layouts reflow at 320 CSS pixels and stay usable at 200% text zoom.
+- Drawers and dialogs return focus to the control that opened them. Search results and saves are announced through an aria-live region.
+- Never convey meaning by color alone; crowd and caption indicators need text labels.
+- Respect `prefers-reduced-motion`. Maintain WCAG 2.2 AA contrast in both light and dark themes.
 - Every async view has loading, empty and human-friendly error states.
 
-## AI at the edges
-- Model output is generated ahead of time or validated before display. Teach-back hints must never reveal the answer; flag any code path that sends the answer key to the client before the attendee answers.
-- Estimated data (crowd, noise) is labelled as an estimate in the UI.
+## Honest data
+- Accessibility facts shown to users come from a cited source (for example the event's official accessibility page). Flag any code or seed data that invents caption availability, noise levels or accommodations, including AI-generated values.
+- Estimates (for example crowd from room type) are labelled as estimates in the UI; unknown values are shown as unknown.
+- Model output is generated ahead of time or validated before display, never on the live demo path.
+- Schedule data is credited to its source. Raw schedule text is not committed to this repository.
+
+## Privacy
+- Plans and notes stay on the device. Anything sent to the server needs explicit consent at the moment of sharing, bounded input, and aggregates hidden below 5 responses.
