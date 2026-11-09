@@ -45,6 +45,24 @@ export function formatEventRange(startsAt: string, endsAt: string): string {
   return `${range}${zoneName(start)}`;
 }
 
+const dayKeyFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: EVENT_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+export function getEventDayKey(value: string): string | null {
+  const date = parseDate(value);
+  return date ? dayKeyFormatter.format(date) : null;
+}
+
+export function formatEventDayLabel(day: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return day;
+  const date = parseDate(`${day}T12:00:00${EVENT_UTC_OFFSET}`);
+  return date ? dateFormatter.format(date) : day;
+}
+
 export function formatEventInstant(date: Date): string {
   return `${dateFormatter.format(date)}, ${timeFormatter.format(date)}${zoneName(date)}`;
 }
@@ -63,4 +81,10 @@ export function parseDemoNow(raw: string | null): Date | null {
     ? raw
     : `${raw}${EVENT_UTC_OFFSET}`;
   return parseDate(withOffset);
+}
+
+export function formatEventTime(value: string): string {
+  const date = parseDate(value);
+  if (!date) return "time unknown";
+  return `${timeFormatter.format(date)}${zoneName(date)}`;
 }

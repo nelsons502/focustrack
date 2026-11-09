@@ -21,6 +21,11 @@ afterEach(() => {
 });
 
 describe("HomePage", () => {
+  it("links to the Now screen", () => {
+    render(<HomePage />);
+    expect(screen.getByRole("link", { name: /Open the Now screen/ })).toHaveAttribute("href", "/now");
+  });
+
   it("credits the schedule source with a link to Sessionize", () => {
     render(<HomePage />);
     const credit = screen.getByRole("link", {
@@ -37,6 +42,21 @@ describe("HomePage", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "FocusTrack" }),
     ).toBeInTheDocument();
+  });
+
+  it("links to Plan and marks Find as the current page", () => {
+    render(<HomePage />);
+    expect(screen.getByRole("link", { name: "Plan" })).toHaveAttribute(
+      "href",
+      "/plan",
+    );
+    expect(screen.getByRole("link", { name: "Find" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      screen.queryByRole("link", { name: "Now" }),
+    ).not.toBeInTheDocument();
   });
 
   it("puts the Find search near the top of the page", () => {

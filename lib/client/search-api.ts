@@ -59,7 +59,7 @@ function isSpeaker(value: unknown): boolean {
   );
 }
 
-function isSession(value: unknown): value is Session {
+export function isSession(value: unknown): value is Session {
   return (
     isRecord(value) &&
     typeof value.id === "string" &&

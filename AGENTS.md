@@ -7,7 +7,7 @@ FocusTrack helps conference attendees take in fewer talks, and take them in well
 - **Focus first.** Every feature should help an attendee stay present and avoid overload. Never add engagement hooks, streaks, notifications, or anything that pulls attention away from the room.
 - **Honest data.** Do not invent accessibility or sensory facts. Only show facts we can source (for example, the official inclusion and accessibility page). Crowd size appears only as a labelled estimate with its basis (for example, "keynote room"), otherwise "unknown".
 - **AI at the edges.** The core path (search results, plan, energy check, Now screen) must work and be explainable without AI. AI may help with optional summaries and semantic search ranking, must be labelled, and must have a non-AI fallback.
-- **Personal data stays on the device.** The plan and notes live in localStorage (`focustrack:v1`). Nothing personal is sent to the server.
+- **Personal data stays on the device.** The plan and notes live in localStorage (`focustrack:v1`). Public session IDs are sent automatically to the schedule lookup API for times and rooms; notes, reflections, breaks and energy settings are not sent. Do not add an extra consent gate for this approved lookup.
 - **Credit the source.** Show "Schedule data: CNCF / Sessionize" with a link wherever schedule data appears. Never commit raw schedule text.
 
 ## Accessibility bar
