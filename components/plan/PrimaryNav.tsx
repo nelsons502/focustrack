@@ -2,6 +2,7 @@
 
 import "./plan.css";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import { withNowParam } from "../../lib/client/now";
 
@@ -39,8 +40,9 @@ function currentFromPathname(pathname: string): PrimaryNavCurrent | undefined {
 
 export default function PrimaryNav({ current, nowParam }: PrimaryNavProps) {
   const location = useSyncExternalStore(subscribe, getLocation, getServerLocation);
-  const [pathname, search = ""] = location.split("?");
-  const resolvedCurrent = current ?? currentFromPathname(pathname ?? "");
+  const routerPathname = usePathname();
+  const [locationPathname, search = ""] = location.split("?");
+  const resolvedCurrent = current ?? currentFromPathname(routerPathname ?? locationPathname ?? "");
   const raw = nowParam ?? new URLSearchParams(search).get("now");
   return (
     <nav aria-label="Primary" className="primary-nav">

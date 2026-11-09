@@ -88,3 +88,13 @@ describe("SettingsView clear data", () => {
     expect(screen.getByText(/public session IDs/)).toBeInTheDocument();
   });
 });
+
+describe("clear confirm focus", () => {
+  it("moves focus into the confirm and back to the trigger on cancel", async () => {
+    render(<SettingsView />);
+    fireEvent.click(screen.getByRole("button", { name: "Clear on-device data" }));
+    await waitFor(() => expect(screen.getByRole("group", { name: /confirm clearing/i })).toHaveFocus());
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Clear on-device data" })).toHaveFocus());
+  });
+});

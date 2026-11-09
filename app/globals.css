@@ -168,6 +168,10 @@ body:has(.now-page) .settings-link {
   color: #8fd6cc;
 }
 
+body:has(.now-page) .site-header a:focus-visible {
+  outline-color: #ffd479;
+}
+
 body:has(.now-page) .site-header .nav-link-current {
   background: #1d2430;
   border-color: #8fd6cc;

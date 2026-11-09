@@ -2,7 +2,7 @@
 
 import "./settings.css";
 import Link from "next/link";
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { DEFAULT_ENERGY_SETTINGS, type EnergySettings } from "../../lib/contract";
 import { stopSim } from "../../lib/client/clock";
 import {
@@ -67,6 +67,17 @@ export default function SettingsView() {
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [status, setStatus] = useState("");
   const clearTriggerRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLDivElement>(null);
+  const restoreFocusRef = useRef(false);
+
+  useEffect(() => {
+    if (confirmingClear) {
+      confirmRef.current?.focus();
+    } else if (restoreFocusRef.current) {
+      restoreFocusRef.current = false;
+      clearTriggerRef.current?.focus();
+    }
+  }, [confirmingClear]);
 
   function saveSettings(next: EnergySettings) {
     updateLocalState({ ...localState, energy: clampEnergySettings(next) });
@@ -111,8 +122,8 @@ export default function SettingsView() {
   }
 
   function closeConfirm() {
+    restoreFocusRef.current = true;
     setConfirmingClear(false);
-    clearTriggerRef.current?.focus();
   }
 
   function handleClear() {
@@ -120,9 +131,9 @@ export default function SettingsView() {
     stopSim();
     clearThemeChoice();
     setNumericDrafts({});
+    restoreFocusRef.current = true;
     setConfirmingClear(false);
     setStatus("On-device data cleared. Your plan, notes, breaks, reflections and settings were removed from this device.");
-    clearTriggerRef.current?.focus();
   }
 
   const rawNow = new URLSearchParams(search).get("now");
@@ -211,7 +222,7 @@ export default function SettingsView() {
           session IDs are sent to the schedule lookup; nothing you wrote is included.
         </p>
         {confirmingClear ? (
-          <div className="clear-confirm">
+          <div className="clear-confirm" ref={confirmRef} tabIndex={-1} role="group" aria-label="Confirm clearing on-device data">
             <p>
               This removes your plan, notes, breaks, reflections and energy settings from
               this device, and stops any demo clock. It cannot be undone.
