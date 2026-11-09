@@ -122,7 +122,7 @@ describe("NowScreen", () => {
     seedPlan(["cur"]);
     mockSessions([current]);
     render(<NowScreen nowParam={DEMO} />);
-    const toggle = await screen.findByRole("button", { name: "Quick notes" });
+    const toggle = await screen.findByRole("button", { name: "Notes" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByLabelText(/Write freely/)).not.toBeInTheDocument();
 
@@ -143,7 +143,88 @@ describe("NowScreen", () => {
 
     fireEvent.keyDown(screen.getByLabelText(/Write freely/), { key: "Escape" });
     expect(screen.queryByLabelText(/Write freely/)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Quick notes" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Notes" })).toHaveFocus();
+  });
+
+  it("labels the Notes button, traps focus in the sheet, and locks body scroll", async () => {
+    seedPlan(["cur"]);
+    mockSessions([current]);
+    render(<NowScreen nowParam={DEMO} />);
+    const toggle = await screen.findByRole("button", { name: "Notes" });
+    expect(toggle).toHaveAttribute("aria-controls", "now-notes-sheet");
+    fireEvent.click(toggle);
+    const dialog = screen.getByRole("dialog", { name: "Session cur" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(document.body.style.overflow).toBe("hidden");
+    const done = screen.getByRole("button", { name: "Done" });
+    done.focus();
+    fireEvent.keyDown(done, { key: "Tab", shiftKey: true });
+    expect(screen.getByLabelText(/Write freely/)).toHaveFocus();
+    fireEvent.keyDown(screen.getByLabelText(/Write freely/), { key: "Tab" });
+    expect(done).toHaveFocus();
+    fireEvent.keyDown(done, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(document.body.style.overflow).toBe("");
+    expect(screen.getByRole("button", { name: "Notes" })).toHaveFocus();
+  });
+
+  describe("on a large screen", () => {
+    beforeEach(() => {
+      vi.stubGlobal(
+        "matchMedia",
+        vi.fn((query: string) => ({
+          matches: true,
+          media: query,
+          addEventListener: () => undefined,
+          removeEventListener: () => undefined,
+        })),
+      );
+    });
+
+    it("docks the notepad in a panel headed by the session title and autosaves", async () => {
+      seedPlan(["cur"]);
+      mockSessions([current]);
+      render(<NowScreen nowParam={DEMO} />);
+      const panel = await screen.findByRole("complementary", { name: "Session cur" });
+      expect(screen.queryByRole("button", { name: "Notes" })).not.toBeInTheDocument();
+      const input = screen.getByLabelText(/Write freely/);
+      expect(panel).toContainElement(input);
+      fireEvent.change(input, { target: { value: "panel note" } });
+      await waitFor(
+        () => expect(getLocalStateSnapshot().notes.cur?.map((n) => n.text)).toEqual(["panel note"]),
+        { timeout: 3000 },
+      );
+      expect(screen.getByRole("status")).toHaveTextContent("Saved");
+    });
+
+    it("shows the last ended session's notes, and saves a draft to its own session at the boundary", async () => {
+      const state = createDefaultLocalState();
+      state.plan.sessionIds = ["cur", "nxt"];
+      state.notes.nxt = [{ text: "next note", at: "2026-11-10T18:50:00.000Z" }];
+      updateLocalState(state);
+      mockSessions([current, next]);
+      const view = render(<NowScreen nowParam="2026-11-10T11:25-07:00" />);
+      fireEvent.change(await screen.findByLabelText(/Write freely/), {
+        target: { value: "late thought" },
+      });
+      view.rerender(<NowScreen nowParam="2026-11-10T11:50-07:00" />);
+      expect(await screen.findByRole("complementary", { name: "Session nxt" })).toBeInTheDocument();
+      expect(screen.getByLabelText(/Write freely/)).toHaveValue("next note");
+      await waitFor(() =>
+        expect(getLocalStateSnapshot().notes.cur?.map((n) => n.text)).toEqual(["late thought"]),
+      );
+      expect(getLocalStateSnapshot().notes.nxt?.map((n) => n.text)).toEqual(["next note"]);
+
+      view.rerender(<NowScreen nowParam="2026-11-10T13:00-07:00" />);
+      expect(await screen.findByRole("complementary", { name: "Session nxt" })).toBeInTheDocument();
+    });
+
+    it("shows a calm empty state with no session", async () => {
+      mockSessions([]);
+      render(<NowScreen nowParam={DEMO} />);
+      expect(await screen.findByText(/Nothing to write yet/)).toBeInTheDocument();
+      expect(screen.queryByLabelText(/Write freely/)).not.toBeInTheDocument();
+    });
   });
 
   it("shows a retryable error when sessions fail to load", async () => {
@@ -161,22 +242,22 @@ describe("NowScreen", () => {
     seedPlan(["cur"]);
     mockSessions([current]);
     render(<NowScreen nowParam={DEMO} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Notes" }));
     fireEvent.change(screen.getByLabelText(/Write freely/), {
       target: { value: "follow up on tracing" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Close notes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(getLocalStateSnapshot().notes.cur.map((n) => n.text)).toEqual([
       "follow up on tracing",
     ]);
-    expect(screen.getByRole("button", { name: "Quick notes" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Notes" })).toHaveFocus();
   });
 
   it("keeps an unsent line focused on its original session when the next session starts", async () => {
     seedPlan(["cur", "nxt"]);
     mockSessions([current, next]);
     const { rerender } = render(<NowScreen nowParam={DEMO} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Notes" }));
     fireEvent.change(screen.getByLabelText(/Write freely/), {
       target: { value: "ask about the next session" },
     });
@@ -184,16 +265,16 @@ describe("NowScreen", () => {
     rerender(<NowScreen nowParam="2026-11-10T11:50-07:00" />);
 
     expect(await screen.findByText("Session nxt")).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Notes for Session cur" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Session cur" })).toBeInTheDocument();
     expect(screen.getByLabelText(/Write freely/)).toHaveValue("ask about the next session");
     expect(screen.getByLabelText(/Write freely/)).toHaveFocus();
-    fireEvent.click(screen.getByRole("button", { name: "Close notes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(getLocalStateSnapshot().notes.cur.map((note) => note.text)).toEqual([
       "ask about the next session",
     ]);
     expect(getLocalStateSnapshot().notes.nxt).toBeUndefined();
     expect(screen.queryByLabelText(/Write freely/)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Quick notes" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Notes" })).toHaveFocus();
   });
 
   it("keeps the transition note during a break after the previous session", async () => {
@@ -208,15 +289,15 @@ describe("NowScreen", () => {
     seedPlan(["cur"]);
     mockSessions([current]);
     const view = render(<NowScreen nowParam="2026-11-10T11:25-07:00" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Notes" }));
     fireEvent.change(screen.getByLabelText(/Write freely/), { target: { value: "last thought" } });
     view.rerender(<NowScreen nowParam="2026-11-10T11:35-07:00" />);
     expect(screen.queryByText("Happening now")).not.toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Notes for Session cur" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Session cur" })).toBeInTheDocument();
     expect(screen.getByLabelText(/Write freely/)).toHaveValue("last thought");
-    fireEvent.click(screen.getByRole("button", { name: "Close notes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(getLocalStateSnapshot().notes.cur.map((n) => n.text)).toEqual(["last thought"]);
-    expect(screen.queryByRole("button", { name: "Quick notes" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Notes" })).not.toBeInTheDocument();
   });
 
   it("flushes a pending draft to its own session, not the new current session", async () => {
@@ -228,16 +309,16 @@ describe("NowScreen", () => {
     updateLocalState(state);
     mockSessions([a, b]);
     const view = render(<NowScreen nowParam="2026-11-10T11:25-07:00" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Notes" }));
     fireEvent.change(screen.getByLabelText(/Write freely/), { target: { value: "a note" } });
     view.rerender(<NowScreen nowParam="2026-11-10T11:31-07:00" />);
-    expect(screen.getByRole("group", { name: "Notes for Session a" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Close notes" }));
+    expect(screen.getByRole("dialog", { name: "Session a" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(getLocalStateSnapshot().notes.a.map((n) => n.text)).toEqual(["a note"]);
     expect(getLocalStateSnapshot().notes.b.map((n) => n.text)).toEqual(["b note"]);
 
-    fireEvent.click(screen.getByRole("button", { name: "Quick notes" }));
-    expect(screen.getByRole("group", { name: "Notes for Session b" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Notes" }));
+    expect(screen.getByRole("dialog", { name: "Session b" })).toBeInTheDocument();
     expect(screen.getByLabelText(/Write freely/)).toHaveValue("b note");
     expect(getLocalStateSnapshot().notes.a.map((note) => note.text)).toEqual(["a note"]);
   });
@@ -252,12 +333,12 @@ describe("NowScreen", () => {
     updateLocalState(state);
     mockSessions([current]);
     render(<NowScreen nowParam={DEMO} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Notes" }));
     expect(screen.getByLabelText(/Write freely/)).toHaveValue("first line\nsecond line");
     fireEvent.change(screen.getByLabelText(/Write freely/), { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: "Close notes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(getLocalStateSnapshot().notes.cur).toEqual([]);
-    fireEvent.click(screen.getByRole("button", { name: "Quick notes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Notes" }));
     expect(screen.getByLabelText(/Write freely/)).toHaveValue("");
   });
 
@@ -308,7 +389,7 @@ describe("NowScreen", () => {
     seedPlan(["cur"]);
     mockSessions([current]);
     const view = render(<NowScreen nowParam={DEMO} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Notes" }));
     fireEvent.change(screen.getByLabelText(/Write freely/), {
       target: { value: "typed just before leaving" },
     });
