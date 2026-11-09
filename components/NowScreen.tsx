@@ -39,6 +39,7 @@ import {
 } from "../lib/client/now-actions";
 import { fetchSessionsByIds } from "../lib/client/sessions-api";
 import { formatEventTime } from "../lib/client/time";
+import PrimaryNav from "./plan/PrimaryNav";
 
 const CLOCK_TICK_MS = 30_000;
 const NOTES_SHOWN = 3;
@@ -230,6 +231,8 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
     <div className="now-page">
       <main id="main" tabIndex={-1} className="now-shell">
         <header className="now-head">
+          <p className="app-name">FocusTrack</p>
+          <PrimaryNav current="now" nowParam={nowParam} />
           <h1>Now</h1>
           {demo ? (
             <p className="now-demo">

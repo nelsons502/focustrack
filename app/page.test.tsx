@@ -54,9 +54,10 @@ describe("HomePage", () => {
       "aria-current",
       "page",
     );
-    expect(
-      screen.queryByRole("link", { name: "Now" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Now" })).toHaveAttribute(
+      "href",
+      "/now",
+    );
   });
 
   it("puts the Find search near the top of the page", () => {
