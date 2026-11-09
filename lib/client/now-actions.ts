@@ -33,6 +33,7 @@ export function markNotAttending(state: LocalState, sessionId: string): LocalSta
   return {
     ...state,
     plan: {
+      ...state.plan,
       sessionIds: state.plan.sessionIds.filter((id) => id !== sessionId),
       notAttending: [...new Set([...state.plan.notAttending, sessionId])],
     },

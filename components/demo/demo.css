@@ -1,0 +1,115 @@
+.demo-bar {
+  position: fixed;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  left: 0.75rem;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 1rem;
+  background: #14231d;
+  color: #f4f7f2;
+  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 35%);
+}
+
+html:has(.demo-bar) {
+  --demo-bar-space: 10rem;
+  scroll-padding-bottom: var(--demo-bar-space);
+}
+
+body:has(.demo-bar) {
+  padding-bottom: var(--demo-bar-space);
+}
+
+@media (max-width: 41.99rem) {
+  html:has(.demo-bar) {
+    --demo-bar-space: clamp(10rem, calc(40vh + 1.5rem), 22rem);
+  }
+
+  .demo-bar {
+    max-height: calc(var(--demo-bar-space) - 0.75rem);
+    overflow-y: auto;
+  }
+}
+
+@supports (height: 100dvh) {
+  @media (max-width: 41.99rem) {
+    html:has(.demo-bar) {
+      --demo-bar-space: clamp(10rem, calc(40dvh + 1.5rem), 22rem);
+    }
+  }
+}
+
+.demo-bar-time {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.demo-bar-label {
+  font-weight: 700;
+}
+
+.demo-bar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.demo-bar-button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #9db8a9;
+  border-radius: 0.75rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.demo-bar-button[aria-pressed="true"] {
+  background: #f4f7f2;
+  color: #14231d;
+  font-weight: 700;
+}
+
+.demo-bar-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.demo-bar-button:focus-visible,
+.demo-play-button:focus-visible {
+  outline: 3px solid #f2a65a;
+  outline-offset: 2px;
+}
+
+.demo-bar-note {
+  width: 100%;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.demo-play-button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.75rem 1.25rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: #1d4a38;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-bar,
+  .demo-bar-button,
+  .demo-play-button {
+    transition: none;
+  }
+}
