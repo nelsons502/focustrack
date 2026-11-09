@@ -89,12 +89,7 @@ function storedState(): LocalState {
 }
 
 async function renderAndLoadPlan() {
-  const view = render(<PlanView />);
-  const loadButton = screen.queryByRole("button", {
-    name: "Load saved sessions from schedule service",
-  });
-  if (loadButton) fireEvent.click(loadButton);
-  return view;
+  return render(<PlanView />);
 }
 
 beforeEach(() => {
@@ -121,23 +116,15 @@ describe("PlanView", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("asks before sending saved session IDs for schedule lookups", async () => {
-    savePlan(["s1"]);
+  it("automatically loads public session details without sending private plan content", async () => {
+    savePlan(["s1"], { notes: { s1: [{ text: "PRIVATE_NOTE", at: "2026-11-10T16:00:00Z" }] } });
     const fetchMock = vi.fn(async () => jsonResponse([makeSession()]));
     vi.stubGlobal("fetch", fetchMock);
     render(<PlanView />);
-    expect(await screen.findByText(/stored only on this device/)).toBeInTheDocument();
-    expect(screen.getByText(/only after you choose to load them/)).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Load saved sessions from schedule service",
-      }),
-    );
-    expect(
-      await screen.findByRole("heading", { name: "Morning Talk" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Morning Talk" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Load saved sessions from schedule service" })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("PRIVATE_NOTE");
   });
 
   it("loads saved sessions by ID and shows a Denver timeline", async () => {
@@ -526,17 +513,6 @@ describe("PlanView", () => {
       });
     });
     expect(
-      screen.getByRole("button", {
-        name: "Load saved sessions from schedule service",
-      }),
-    ).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Load saved sessions from schedule service",
-      }),
-    );
-    expect(
       await screen.findByText(/Loading your saved sessions/),
     ).toBeInTheDocument();
     expect(
@@ -594,11 +570,6 @@ describe("PlanView", () => {
         plan: { ...current.plan, sessionIds: [...current.plan.sessionIds, "e"] },
       });
     });
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Load saved sessions from schedule service",
-      }),
-    );
     expect(
       await screen.findByText(/Loading your saved sessions/),
     ).toBeInTheDocument();

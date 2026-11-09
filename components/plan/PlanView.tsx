@@ -91,17 +91,9 @@ export default function PlanView() {
   const [removedBreak, setRemovedBreak] = useState<PlanBreak | null>(null);
   const [chosenDay, setChosenDay] = useState<string | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
-  const [consentedIds, setConsentedIds] = useState<string[]>([]);
-  const consentedIdSet = useMemo(() => new Set(consentedIds), [consentedIds]);
-  const hasConsentForCurrentIds = sessionIds.every((id) =>
-    consentedIdSet.has(id),
-  );
-  const consentRequired =
-    sessionIds.length > 0 && !hasConsentForCurrentIds;
   const requestKey = `${retryNonce}:${sessionIds.join(",")}`;
 
   useEffect(() => {
-    if (!hasConsentForCurrentIds) return undefined;
     const controller = new AbortController();
     let cancelled = false;
     fetchSessionsByIds(sessionIds, controller.signal)
@@ -126,11 +118,11 @@ export default function PlanView() {
       cancelled = true;
       controller.abort();
     };
-  }, [sessionIds, requestKey, hasConsentForCurrentIds]);
+  }, [sessionIds, requestKey]);
 
   const isCurrent = loaded !== null && loaded.key === requestKey;
   const loading =
-    hasConsentForCurrentIds && sessionIds.length > 0 && !isCurrent;
+    sessionIds.length > 0 && !isCurrent;
   const errorMessage = isCurrent ? loaded.error : null;
   const savedIdSet = useMemo(() => new Set(sessionIds), [sessionIds]);
   const sessions = useMemo(
@@ -221,10 +213,6 @@ export default function PlanView() {
     () => checkEnergy(daySessions, settings),
     [daySessions, settings],
   );
-
-  function handleLoadSavedSessions() {
-    setConsentedIds([...sessionIds]);
-  }
 
   function removeById(id: string, label: string) {
     const saved = updateLocalState(removeSessionFromPlan(localState, id));
@@ -354,9 +342,7 @@ export default function PlanView() {
       ? "Your plan is empty."
       : errorMessage
         ? "Your saved sessions could not be loaded."
-        : consentRequired
-          ? "Choose whether to load your saved sessions."
-          : loading
+        : loading
             ? "Loading your saved sessions…"
             : `${sessions.length} saved session${sessions.length === 1 ? "" : "s"} loaded.`;
 
@@ -367,26 +353,9 @@ export default function PlanView() {
       </h2>
       <p className="plan-intro">
         Your plan and notes are stored only on this device. The schedule service
-        receives your saved session IDs only after you choose to load them, to
-        look up their times and rooms. Your notes, quiet-room breaks and settings
+        receives public session IDs to look up their times and rooms. Your notes, quiet-room breaks and settings
         are not sent.
       </p>
-      {consentRequired ? (
-        <div className="state-box">
-          <p>
-            Loading sends the session IDs currently in your plan to the schedule
-            service. Your notes, breaks and energy settings are not sent. Adding
-            another session asks you before its ID is sent.
-          </p>
-          <button
-            type="button"
-            className="button button-primary"
-            onClick={handleLoadSavedSessions}
-          >
-            Load saved sessions from schedule service
-          </button>
-        </div>
-      ) : null}
       <p className="status" role="status" aria-live="polite" aria-atomic="true">
         {statusText}
       </p>
