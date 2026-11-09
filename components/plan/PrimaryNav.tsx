@@ -4,6 +4,7 @@ import "./plan.css";
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { withNowParam } from "../../lib/client/now";
+import { setNowOptOut } from "../now/now-helpers";
 
 export type PrimaryNavCurrent = "find" | "plan" | "now" | "reflect";
 
@@ -40,6 +41,7 @@ export default function PrimaryNav({ current, nowParam }: PrimaryNavProps) {
         <Link
           key={link.key}
           href={withNowParam(link.path, raw)}
+          onClick={link.key === "find" ? () => setNowOptOut() : undefined}
           className={current === link.key ? "nav-link nav-link-current" : "nav-link"}
           aria-current={current === link.key ? "page" : undefined}
         >

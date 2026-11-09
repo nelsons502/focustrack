@@ -1,0 +1,33 @@
+.now-browse-row {
+  margin: 0.75rem 0 0;
+}
+
+.now-heads-up {
+  font-weight: 600;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.now-reflect .now-label {
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 1.25rem;
+}
+
+.now-notepad {
+  width: 100%;
+  min-height: 9rem;
+  box-sizing: border-box;
+  padding: 0.75rem;
+  border-radius: 12px;
+  border: 1px solid var(--now-border, #3a4656);
+  background: var(--now-surface, #141a22);
+  color: var(--now-fg, #dde3ea);
+  font: inherit;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.now-page textarea:focus-visible {
+  outline: 3px solid var(--now-focus, #ffd479);
+  outline-offset: 2px;
+}
