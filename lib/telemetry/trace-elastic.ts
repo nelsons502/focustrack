@@ -12,8 +12,8 @@ function recordMetrics(attributes: SafeElasticAttributes, startedAt: number, fai
   const meter = metrics.getMeter(FOCUSTRACK_SCOPE);
   if (meter !== cachedMeter) {
     cachedMeter = meter;
-    operationCounter = meter.createCounter("focustrack.elastic.operations");
-    operationDuration = meter.createHistogram("focustrack.elastic.duration_ms");
+    operationCounter = meter.createCounter("focustrack.elastic.operations", { unit: "{operation}" });
+    operationDuration = meter.createHistogram("focustrack.elastic.duration_ms", { unit: "ms" });
   }
   if (!operationCounter || !operationDuration) {
     return;

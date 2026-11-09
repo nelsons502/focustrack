@@ -7,6 +7,7 @@ import { DataPointType } from "@opentelemetry/sdk-metrics";
 import type { MetricData, PushMetricExporter, ResourceMetrics } from "@opentelemetry/sdk-metrics";
 import type { ReadableSpan, SpanExporter } from "@opentelemetry/sdk-trace-base";
 import { FOCUSTRACK_SCOPE, safeEventName, safeSpanContext, safeSpanName, toSafeExportAttributes } from "./sanitize.ts";
+import { processInstanceId } from "./resource.ts";
 
 const SAFE_RESOURCE_KEYS: ReadonlySet<string> = new Set([
   "service.name",
@@ -21,7 +22,10 @@ const SAFE_RESOURCE_KEYS: ReadonlySet<string> = new Set([
 const SAFE_RESOURCE_VALUE = /^[A-Za-z0-9][A-Za-z0-9_.+-]{0,127}$/;
 
 export function safeResource(resource: Resource): Resource {
-  const attributes: Record<string, string | number | boolean> = { "service.name": "focustrack" };
+  const attributes: Record<string, string | number | boolean> = {
+    "service.name": "focustrack",
+    "service.instance.id": processInstanceId(),
+  };
   for (const [key, value] of Object.entries(resource.attributes)) {
     if (key === "service.name" || !SAFE_RESOURCE_KEYS.has(key)) {
       continue;
@@ -93,11 +97,11 @@ export class SafeSpanExporter implements SpanExporter {
 const SAFE_METRIC_DESCRIPTORS: ReadonlyMap<string, MetricData["descriptor"]> = new Map([
   [
     "focustrack.elastic.operations",
-    { name: "focustrack.elastic.operations", description: "", unit: "", valueType: ValueType.INT },
+    { name: "focustrack.elastic.operations", description: "", unit: "{operation}", valueType: ValueType.INT },
   ],
   [
     "focustrack.elastic.duration_ms",
-    { name: "focustrack.elastic.duration_ms", description: "", unit: "", valueType: ValueType.DOUBLE },
+    { name: "focustrack.elastic.duration_ms", description: "", unit: "ms", valueType: ValueType.DOUBLE },
   ],
 ]);
 
