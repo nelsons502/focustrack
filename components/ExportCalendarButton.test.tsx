@@ -176,6 +176,48 @@ describe("ExportCalendarButton", () => {
     click.mockRestore();
   });
 
+  it("exports a quiet break when the plan has no sessions", async () => {
+    updateLocalState({
+      ...createDefaultLocalState(),
+      plan: {
+        sessionIds: [],
+        notAttending: [],
+        breaks: [
+          {
+            id: "break-only",
+            startsAt: "2026-11-10T10:00:00-07:00",
+            endsAt: "2026-11-10T10:20:00-07:00",
+            room: QUIET_ROOM_260A,
+          },
+        ],
+      },
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const blobs: Blob[] = [];
+    const createObjectURL = vi.fn((blob: Blob) => {
+      blobs.push(blob);
+      return "blob:test";
+    });
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
+
+    render(<ExportCalendarButton />);
+    const button = await screen.findByRole("button", {
+      name: /add my plan to my calendar/i,
+    });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    await waitFor(() => expect(blobs).toHaveLength(1));
+    expect(fetchMock).not.toHaveBeenCalled();
+    const ics = await blobs[0].text();
+    expect(ics).toContain("SUMMARY:Quiet break");
+    expect(ics).toContain("UID:break-only@focustrack");
+    click.mockRestore();
+  });
+
   it("shows an error when none of the planned sessions are in the schedule", async () => {
     storePlan(["stale"]);
     vi.stubGlobal(
