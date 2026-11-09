@@ -35,6 +35,16 @@ it('reuses cached Markdown without another network request', async () => {
   expect(await fetchMarkdown('sessions/1.md','https://example.com/session/1')).toBe('# Cached session\n- **Session ID:** 1\n');
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
+it('refetches files marked always-fetch even when a valid copy is cached', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'focustrack-ingest-test-'));
+  temporaryDirectories.push(directory);
+  const fetchMarkdown = createMarkdownFetcher(directory, new Set(['sessions/1.md']));
+  const fetchMock = vi.fn().mockImplementation(async () => new Response('# Fresh session\n- **Session ID:** 1\n'));
+  vi.stubGlobal('fetch', fetchMock);
+  await fetchMarkdown('sessions/1.md','https://example.com/session/1');
+  await fetchMarkdown('sessions/1.md','https://example.com/session/1');
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});
 it('spaces uncached request starts by at least one second', async () => {
   const fetchMarkdown = await temporaryCache();
   const starts: number[] = [];

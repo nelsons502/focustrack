@@ -99,6 +99,10 @@ export type Session = {
   captions: Captions;
   plainSummary?: string;
   summarySource?: "ai-reviewed";
+  autoSummary?: string;
+  autoSummaryAt?: string;
+  autoSummaryModel?: string;
+  descriptionHash?: string;
   sourceUrl: string;
 };
 
