@@ -27,4 +27,3 @@
 
 - [🍲 Lunch](https://sessionize.com/api/v2/uo948i5p/view/markdown/session/1289749)
   12:50 pm - 2:50 pm · Salt Palace | Level 1 | Halls A-C, Halls 1-5
-
