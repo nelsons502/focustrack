@@ -20,7 +20,7 @@ A big conference packs hundreds of sessions into a few days. For autistic, anxio
 | Find | Live on main | Hybrid search (keyword plus semantic) over the real KubeCon NA 2026 schedule. Filter by day and hide restricted sessions (sold out, separate registration, all-access pass). Results show event-time schedule, room, speakers, and type. |
 | Plan | On main ([PR #13](https://github.com/nelsons502/focustrack/pull/13)). | Save session IDs locally, review overlaps and load against adjustable thresholds, and choose a real quiet-room break. |
 | Be present | On main ([PR #7](https://github.com/nelsons502/focustrack/pull/7)) | A calm Now screen with the current and next session, device-local notes, and a reversible not-attending action. |
-| Plain-language summaries | Prepared data on main ([PR #6](https://github.com/nelsons502/focustrack/pull/6)); display integration pending. | Ten reviewed previews, ready to apply to Elastic and display with an explicit AI label after approval. |
+| Plain-language summaries | Prepared data on main ([PR #6](https://github.com/nelsons502/focustrack/pull/6)); display integration pending. | Ten reviewed previews, applied to Elastic; visible app previews and an explicit AI label still need integration. |
 
 Honest accessibility data runs through all of it. Crowd and noise appear only as labelled estimates with their basis, or as "unknown", and never as "small" or "quiet". Caption and quiet-room information comes from the official accessibility page. If semantic search is unavailable, the API falls back to keyword search and the UI says so.
 
@@ -50,9 +50,9 @@ Key decisions:
 
 **Gitar (Sonar).** Features land as separate pull requests. Project-aware review rules live in [`.gitar/review/conventions.md`](.gitar/review/conventions.md) (strict TypeScript, event time zones, Elastic as the data layer, RRF) and [`.gitar/review/product-principles.md`](.gitar/review/product-principles.md) (focus-first, accessibility, honest data, privacy). Gitar findings, automatic code corrections, and CI outcomes are visible on the [pull requests](https://github.com/nelsons502/focustrack/pulls?q=is%3Apr).
 
-**Radar.** The app runs on Kubernetes in the team namespace, deployed by Argo CD from [`argocd/application.yaml`](argocd/application.yaml) and [`deploy/`](deploy/), with a GitHub Actions image workflow ([`.github/workflows/image.yml`](.github/workflows/image.yml)). Setup, probes, and the release flow are documented in [`docs/radar.md`](docs/radar.md). A [completed Radar investigation](https://app.radarhq.io/c/uRdEIEL90Yk/investigations/chat_ie6DbFJiQMGlhJN_?org=org_NCJbssDGEBsU) found the deployment healthy at that point in time and identified the missing disruption budget implemented in merged [PR #15](https://github.com/nelsons502/focustrack/pull/15). Before/after Checks screenshot capture remains pending verification.
+**Radar.** The app runs on Kubernetes in the team namespace, deployed by Argo CD from [`argocd/application.yaml`](argocd/application.yaml) and [`deploy/`](deploy/), with a GitHub Actions image workflow ([`.github/workflows/image.yml`](.github/workflows/image.yml)). Setup, probes, and the release flow are documented in [`docs/radar.md`](docs/radar.md). A [completed Radar investigation](https://app.radarhq.io/c/uRdEIEL90Yk/investigations/chat_ie6DbFJiQMGlhJN_?org=org_NCJbssDGEBsU) found the deployment healthy at that point in time and identified the missing disruption budget implemented in merged [PR #15](https://github.com/nelsons502/focustrack/pull/15). Read-only verification on November 9 found two ready replicas and zero Radar Checks findings, down from four medium findings before the hardening and orphan cleanup. Before/after screenshot capture remains pending.
 
-**Dash0.** Server traces, correlated logs and metrics around Elastic calls are on main ([PR #14](https://github.com/nelsons502/focustrack/pull/14)). CLI telemetry has been verified; deployed HTTP telemetry, browser monitoring and a dashboard/SLO still need verification or implementation.
+**Dash0.** Server traces, correlated logs and metrics around Elastic calls are on main ([PR #14](https://github.com/nelsons502/focustrack/pull/14)). CLI telemetry is verified. A deployed hybrid search on November 9 at 21:04 UTC produced an `elastic.search` span, a completion log with the same mode and result count, and an operations metric update in Dash0. Browser monitoring and a dashboard/SLO remain pending.
 
 ## Accessibility
 
@@ -85,7 +85,7 @@ Schedule data: CNCF / Sessionize ([source](https://sessionize.com/api/v2/uo948i5
 
 ## AI disclosure
 
-Nelson Schnepf defined the problem, vision, data contract, architecture, and scope, and reviews and merges every pull request.
+Nelson Schnepf defined the problem, vision, data contract, architecture, and scope, and directs review and merge decisions. Coding agents apply scoped corrections and merge approved PRs under his authorization.
 
 AI coding agents wrote most of the code under that direction:
 
