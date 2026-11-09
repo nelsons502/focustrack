@@ -100,6 +100,25 @@ describe("safe attributes and errors", () => {
 });
 
 describe("traceElasticOperation", () => {
+  it("declares units when creating the real instruments", async () => {
+    const { metrics } = await import("@opentelemetry/api");
+    const counter = { add: vi.fn() };
+    const histogram = { record: vi.fn() };
+    const createCounter = vi.fn(() => counter);
+    const createHistogram = vi.fn(() => histogram);
+    const meter = { createCounter, createHistogram } as unknown as ReturnType<typeof metrics.getMeter>;
+    const spy = vi.spyOn(metrics, "getMeter").mockReturnValue(meter);
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    try {
+      await traceElasticOperation("elastic.search", { operation: "search" }, () => "ok");
+      expect(createCounter).toHaveBeenCalledWith("focustrack.elastic.operations", { unit: "{operation}" });
+      expect(createHistogram).toHaveBeenCalledWith("focustrack.elastic.duration_ms", { unit: "ms" });
+    } finally {
+      spy.mockRestore();
+      info.mockRestore();
+    }
+  });
+
   it("runs the callback and returns its result when telemetry is a no-op", async () => {
     const callback = vi.fn(async () => 7);
     await expect(traceElasticOperation("elastic.search", { operation: "search" }, callback)).resolves.toBe(7);
