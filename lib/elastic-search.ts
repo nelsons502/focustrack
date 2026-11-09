@@ -24,7 +24,10 @@ function parameter(params: URLSearchParams, name: string): string | null {
   return params.get(name);
 }
 
-function sessionOnly(source: Session): Session {
+function sessionOnly(source: Partial<Session>): Session {
+  if (typeof source.id !== "string" || typeof source.title !== "string" || !Array.isArray(source.speakers)) {
+    throw new Error("Malformed session source");
+  }
   const session = Object.fromEntries(
     SESSION_FIELDS.filter((key) => source[key] !== undefined).map((key) => [key, source[key]]),
   ) as Session;

@@ -114,6 +114,12 @@ describe("search API", () => {
     expect((await result.json()).mode).toBe("lexical-fallback");
     expect(elastic.search).toHaveBeenCalledTimes(2);
   });
+
+  it("rejects malformed session sources returned by search", async () => {
+    elastic.search.mockResolvedValue({ ...response, hits: { hits: [{ _source: { speakers: [] } }] } });
+    const result = await search(request("/api/search"));
+    expect(result.status).toBe(503);
+  });
 });
 
 describe("sessions API", () => {
@@ -145,5 +151,11 @@ describe("sessions API", () => {
     const result = await sessions(request("/api/sessions?ids=1"));
     expect(result.status).toBe(503);
     expect(await result.text()).not.toContain("private upstream detail");
+  });
+
+  it("rejects malformed session sources returned by mget", async () => {
+    elastic.mget.mockResolvedValue({ docs: [{ _id: "1", found: true, _source: { speakers: [] } }] });
+    const result = await sessions(request("/api/sessions?ids=1"));
+    expect(result.status).toBe(503);
   });
 });
