@@ -205,9 +205,11 @@ export default function ReflectView() {
         </ul>
       )}
       <div className="reflect-actions">
-        <button type="button" className="button" onClick={() => setView({ kind: "recap" })}>
-          Night-of recap
-        </button>
+        {status === "success" ? (
+          <button type="button" className="button" onClick={() => setView({ kind: "recap" })}>
+            Night-of recap
+          </button>
+        ) : null}
         <a className="reflect-nav-link" href={homeHref}>
           Back to FocusTrack
         </a>

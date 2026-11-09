@@ -48,6 +48,13 @@ describe("findContrast", () => {
     });
   });
 
+  it("does not absorb a preceding capitalised word into a single-word term", () => {
+    expect(findContrast("Discussing Kubernetes vs Docker")).toEqual({
+      first: "Kubernetes",
+      second: "Docker",
+    });
+  });
+
   it("ignores lowercase or and identical terms", () => {
     expect(findContrast("faster or slower builds")).toBeNull();
     expect(findContrast("Helm or helm")).toBeNull();
