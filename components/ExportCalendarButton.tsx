@@ -11,7 +11,6 @@ import { fetchSessionsByIds } from "../lib/client/search-api";
 
 type ExportStatus = "idle" | "working" | "ready" | "error";
 
-const BATCH_SIZE = 50;
 const FILE_NAME = "focustrack-plan.ics";
 
 function downloadFile(content: string): void {
@@ -41,13 +40,10 @@ export default function ExportCalendarButton() {
     setStatus("working");
     setErrorMessage("");
     try {
-      const batches: string[][] = [];
-      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-        batches.push(ids.slice(i, i + BATCH_SIZE));
-      }
-      const sessions = (
-        await Promise.all(batches.map((batch) => fetchSessionsByIds(batch)))
-      ).flat();
+      const sessions = await fetchSessionsByIds(
+        [...ids],
+        new AbortController().signal,
+      );
       const ordered = ids.flatMap((id) => {
         const match = sessions.find((session) => session.id === id);
         return match ? [match] : [];

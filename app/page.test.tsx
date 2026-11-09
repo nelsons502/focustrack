@@ -21,6 +21,11 @@ afterEach(() => {
 });
 
 describe("HomePage", () => {
+  it("links to the Now screen", () => {
+    render(<HomePage />);
+    expect(screen.getByRole("link", { name: /Open the Now screen/ })).toHaveAttribute("href", "/now");
+  });
+
   it("credits the schedule source with a link to Sessionize", () => {
     render(<HomePage />);
     const credit = screen.getByRole("link", {

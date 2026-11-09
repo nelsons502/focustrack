@@ -59,7 +59,7 @@ function isSpeaker(value: unknown): boolean {
   );
 }
 
-function isSession(value: unknown): value is Session {
+export function isSession(value: unknown): value is Session {
   return (
     isRecord(value) &&
     typeof value.id === "string" &&
@@ -146,20 +146,21 @@ export async function fetchSearch(
   };
 }
 
-export async function fetchSessionsByIds(
-  ids: readonly string[],
-  signal?: AbortSignal,
+const MAX_IDS_PER_REQUEST = 50;
+
+async function fetchSessionChunk(
+  ids: string[],
+  signal: AbortSignal,
 ): Promise<Session[]> {
-  const unavailable = "Your sessions could not be loaded. Please try again shortly.";
-  if (ids.length === 0) return [];
+  const unavailable = "Your sessions could not be loaded right now. Please try again.";
   let response: Response;
   try {
-    response = await fetch(
-      `/api/sessions?ids=${encodeURIComponent(ids.join(","))}`,
-      { signal, headers: { Accept: "application/json" } },
-    );
+    response = await fetch(`/api/sessions?ids=${encodeURIComponent(ids.join(","))}`, {
+      signal,
+      headers: { Accept: "application/json" },
+    });
   } catch (error) {
-    if (signal?.aborted) throw error;
+    if (signal.aborted) throw error;
     throw new Error(unavailable);
   }
   let body: unknown;
@@ -170,4 +171,18 @@ export async function fetchSessionsByIds(
   }
   if (!response.ok || !Array.isArray(body)) throw new Error(unavailable);
   return body.filter(isSession);
+}
+
+export async function fetchSessionsByIds(
+  ids: string[],
+  signal: AbortSignal,
+): Promise<Session[]> {
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += MAX_IDS_PER_REQUEST) {
+    chunks.push(ids.slice(i, i + MAX_IDS_PER_REQUEST));
+  }
+  const batches = await Promise.all(
+    chunks.map((chunk) => fetchSessionChunk(chunk, signal)),
+  );
+  return batches.flat();
 }
