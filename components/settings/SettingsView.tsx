@@ -127,7 +127,12 @@ export default function SettingsView() {
   }
 
   function handleClear() {
-    updateLocalState(createDefaultLocalState());
+    const previous = getLocalStateSnapshot();
+    if (!updateLocalState(createDefaultLocalState())) {
+      updateLocalState(previous);
+      setStatus("Could not clear saved data. Your saved data may still be on this device. Please try again.");
+      return;
+    }
     stopSim();
     clearThemeChoice();
     setNumericDrafts({});
@@ -208,7 +213,7 @@ export default function SettingsView() {
 
       <section aria-labelledby="settings-demo-heading" className="settings-card">
         <h2 id="settings-demo-heading">Demo</h2>
-        <p>See a conference day unfold at 60× speed, without touching a real plan of your own making.</p>
+        <p>See a conference day unfold at 60× speed. Starting the demo replaces your saved plan; notes and reflections stay on this device.</p>
         <Link href={withNowParam("/demo", rawNow)} className="button settings-demo-link">
           Play my day
         </Link>
@@ -218,7 +223,8 @@ export default function SettingsView() {
         <h2 id="settings-privacy-heading">Your data on this device</h2>
         <p>
           Your plan, notes, breaks, reflections and energy settings stay on this device.
-          They are not sent to a server. To show times and rooms for saved talks, public
+          They are not sent to a server. This page uses system fonts and does not request
+          fonts from a third party. To show times and rooms for saved talks, public
           session IDs are sent to the schedule lookup; nothing you wrote is included.
         </p>
         {confirmingClear ? (

@@ -1,6 +1,7 @@
 import { resumeSim, startSim, stopSim } from "../client/clock";
 import { getLocalStateSnapshot, updateLocalState } from "../client/local-state";
 import {
+  NOW_OPT_OUT_KEY,
   QUIET_ROOM_260A,
   type LocalState,
   type PlanBreak,
@@ -33,9 +34,6 @@ export const MAYA_BREAK: PlanBreak = {
 
 export const MAYA_DEMO_START_ISO = "2026-11-10T11:10:00-07:00";
 export const MAYA_DEMO_SPEED = 60;
-
-// Mission 2's session-scoped opt-out; a fresh demo must not inherit it.
-export const NOW_OPT_OUT_KEY = "focustrack:now-opt-out";
 
 const MAYA_MOMENTS: readonly string[] = [
   ...new Set(

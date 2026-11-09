@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs/promises';
+import * as timers from 'node:timers/promises';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -26,6 +27,8 @@ it('rejects typos and invalid days before any destructive work', () => {
 });
 
 vi.mock('node:fs/promises', async importOriginal => ({...await importOriginal<typeof import('node:fs/promises')>()}));
+
+vi.mock('node:timers/promises', async importOriginal => ({...await importOriginal<typeof import('node:timers/promises')>()}));
 
 const temporaryDirectories: string[] = [];
 afterEach(async () => {
@@ -66,6 +69,24 @@ it('spaces uncached request starts by at least one second', async () => {
   await fetchMarkdown('sessions/1.md','https://example.com/session/1');
   await fetchMarkdown('sessions/2.md','https://example.com/session/2');
   expect(starts[1] - starts[0]).toBeGreaterThanOrEqual(1000);
+});
+it('keeps request starts a second apart when timers wake early', async () => {
+  const {fetchMarkdown} = await workspaceCache();
+  let now = 10_000;
+  vi.spyOn(Date, 'now').mockImplementation(() => now);
+  vi.spyOn(timers, 'setTimeout').mockImplementation(async <T = void>(delay?: number, value?: T) => {
+    now += Math.max(1, (delay ?? 1) - 1);
+    return value as T;
+  });
+  const starts: number[] = [];
+  vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => {
+    starts.push(Date.now());
+    return new Response(`# Session\n- **Session ID:** ${starts.length}\n`);
+  }));
+  await fetchMarkdown('1.md', `${sourceUrl}/session/1`);
+  await fetchMarkdown('2.md', `${sourceUrl}/session/2`);
+  await fetchMarkdown('3.md', `${sourceUrl}/session/3`);
+  expect(starts.slice(1).map((start, index) => start - starts[index])).toEqual([1000, 1000]);
 });
 it('fails for HTTP errors and invalid Markdown', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('Unavailable',{status:503})));
