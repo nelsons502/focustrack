@@ -20,6 +20,7 @@ export function checkEnergy(sessions: Session[], settings: EnergySettings): Ener
   let runDrop: string | undefined;
   let dailyDrop: string | undefined;
   let breakStart: string | undefined;
+  let warnedDay: number | undefined;
   let run: string[] = [];
   let busyEnd = -Infinity;
   let busyEndAt = '';
@@ -54,10 +55,12 @@ export function checkEnergy(sessions: Session[], settings: EnergySettings): Ener
         : levelChanged ? settings.levelChangeMinutes : settings.transitionMinutes;
       if (gapMinutes < neededMinutes) {
         warnings.push({ type: 'tight-transition', fromId: from.id, toId: session.id, gapMinutes, neededMinutes });
+        warnedDay = dayStart(start);
       }
     }
     if (previous) {
-      if (!breakStart && sameDay && warnings.length && (start - busyEnd) / MINUTE >= settings.minBreakMinutes) {
+      if (!breakStart && sameDay && warnedDay === dayStart(start)
+        && (start - busyEnd) / MINUTE >= settings.minBreakMinutes) {
         breakStart = busyEndAt;
       }
     }
@@ -70,6 +73,7 @@ export function checkEnergy(sessions: Session[], settings: EnergySettings): Ener
 
     if (settings.flagLoudRooms && session.noiseEstimate === 'loud') {
       warnings.push({ type: 'loud-room', sessionId: session.id });
+      warnedDay = dayStart(start);
     }
 
     if (end <= start) continue;
@@ -78,6 +82,7 @@ export function checkEnergy(sessions: Session[], settings: EnergySettings): Ener
       const other = sorted[earlier];
       if (other.end > other.start && other.end > start) {
         warnings.push({ type: 'overlap', sessionIds: [other.session.id, session.id] });
+        warnedDay = dayStart(start);
         overlapDrop ??= session.id;
       }
     }

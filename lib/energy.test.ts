@@ -238,4 +238,17 @@ describe('checkEnergy', () => {
     expect(checkEnergy([session('a', '09:00', '10:00'), session('b', '11:00', '12:00'), loud],
       DEFAULT_ENERGY_SETTINGS).suggestion).toBeUndefined();
   });
+
+  it('does not suggest an unrelated break after the warned day', () => {
+    const loud = session('loud', '09:00', '10:00', { noiseEstimate: 'loud' });
+    const nextDay = [
+      session('a', '09:00', '10:00', {
+        startsAt: '2026-11-11T09:00:00-07:00', endsAt: '2026-11-11T10:00:00-07:00', day: '2026-11-11',
+      }),
+      session('b', '11:00', '12:00', {
+        startsAt: '2026-11-11T11:00:00-07:00', endsAt: '2026-11-11T12:00:00-07:00', day: '2026-11-11',
+      }),
+    ];
+    expect(checkEnergy([loud, ...nextDay], DEFAULT_ENERGY_SETTINGS).suggestion).toBeUndefined();
+  });
 });
