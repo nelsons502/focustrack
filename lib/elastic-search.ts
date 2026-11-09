@@ -11,6 +11,7 @@ import {
   type SessionKind,
 } from "./contract";
 import { createElasticClient } from "./elastic";
+import { traceElasticOperation } from "./telemetry/trace-elastic.ts";
 
 let cachedClient: Client | undefined;
 
@@ -136,7 +137,9 @@ export async function searchSessions(params: URLSearchParams): Promise<SearchRes
   const filter: estypes.QueryDslQueryContainer[] = [];
   if (day !== null) filter.push({ term: { day } });
   if (excludeRestricted === "true") {
-    filter.push({ bool: { must_not: [{ terms: { restrictions: [...RESTRICTIONS] } }] } });
+    filter.push({ bool: { must_not: [{ terms: { restrictions: [
+      "sold-out", "separate-registration", "all-access-pass",
+    ] } }] } });
   }
   const lexical: estypes.QueryDslQueryContainer = q
     ? { multi_match: { query: q, fields: ["title^2", "description"] } }
@@ -149,25 +152,36 @@ export async function searchSessions(params: URLSearchParams): Promise<SearchRes
     allow_partial_search_results: false,
   };
   const client = getElasticClient();
-  if (q) {
-    try {
-      const result = await client.search<unknown>({
-        ...common,
-        timeout: "8s",
-        retriever: { rrf: { rank_window_size: 60, rank_constant: 60, retrievers: [
-          { standard: { query } },
-          { standard: { query: { bool: {
-            must: [{ semantic: { field: "description_semantic", query: q } }], filter,
-          } } } },
-        ] } },
-      }, { requestTimeout: 10_000 });
-      return { results: requireComplete(result), mode: "hybrid", tookMs: elapsed(started) };
-    } catch {
-      console.warn({ event: "search_lexical_fallback" });
-      return lexicalSearch(client, common, query, started);
+  return traceElasticOperation("elastic.search", { operation: "search" }, async (controls) => {
+    const finish = (response: SearchResponse, fallbackUsed: boolean): SearchResponse => {
+      controls.setSafeAttributes({
+        searchMode: response.mode,
+        tookMs: response.tookMs,
+        resultCount: response.results.length,
+        fallbackUsed,
+      });
+      return response;
+    };
+    if (q) {
+      try {
+        const result = await client.search<unknown>({
+          ...common,
+          timeout: "8s",
+          retriever: { rrf: { rank_window_size: 60, rank_constant: 60, retrievers: [
+            { standard: { query } },
+            { standard: { query: { bool: {
+              must: [{ semantic: { field: "description_semantic", query: q } }], filter,
+            } } } },
+          ] } },
+        }, { requestTimeout: 10_000 });
+        return finish({ results: requireComplete(result), mode: "hybrid", tookMs: elapsed(started) }, false);
+      } catch {
+        console.warn({ event: "search_lexical_fallback" });
+        return finish(await lexicalSearch(client, common, query, started), true);
+      }
     }
-  }
-  return lexicalSearch(client, { ...common, sort: [{ startsAt: "asc" }, { id: "asc" }] }, query, started);
+    return finish(await lexicalSearch(client, { ...common, sort: [{ startsAt: "asc" }, { id: "asc" }] }, query, started), false);
+  });
 }
 
 function elapsed(started: number): number {
@@ -192,19 +206,24 @@ export async function getSessionsByIds(params: URLSearchParams): Promise<Session
     throw new ApiInputError("Provide up to 50 valid session IDs separated by commas.");
   }
   const ids = [...new Set(requested)];
-  const result = await getElasticClient().mget<unknown>({
-    index: INDEX_NAME, ids, _source: [...SESSION_FIELDS],
-  }, { requestTimeout: 5_000 });
-  const found = new Map<string, Session>();
-  for (const doc of result.docs) {
-    if ("error" in doc) throw new Error("Session retrieval failed");
-    if (doc.found) {
-      if (!doc._source) throw new Error("Missing session source");
-      found.set(doc._id, sessionOnly(doc._source));
+  return traceElasticOperation("elastic.lookup", { operation: "lookup" }, async (controls) => {
+    const lookupStarted = performance.now();
+    const result = await getElasticClient().mget<unknown>({
+      index: INDEX_NAME, ids, _source: [...SESSION_FIELDS],
+    }, { requestTimeout: 5_000 });
+    const found = new Map<string, Session>();
+    for (const doc of result.docs) {
+      if ("error" in doc) throw new Error("Session retrieval failed");
+      if (doc.found) {
+        if (!doc._source) throw new Error("Missing session source");
+        found.set(doc._id, sessionOnly(doc._source));
+      }
     }
-  }
-  return ids.flatMap((id) => {
-    const session = found.get(id);
-    return session ? [session] : [];
+    const sessions = ids.flatMap((id) => {
+      const session = found.get(id);
+      return session ? [session] : [];
+    });
+    controls.setSafeAttributes({ tookMs: elapsed(lookupStarted), resultCount: sessions.length });
+    return sessions;
   });
 }
