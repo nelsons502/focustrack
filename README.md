@@ -26,7 +26,7 @@ The home page searches the live schedule through `GET /api/search`. Type a topic
 
 Each result shows the session time in event time (America/Denver, whatever your device clock says), room, speakers, session type and any ticket restrictions. Crowd and noise are shown only as labelled estimates with their basis, or as "unknown". Wordly captions are mentioned only where the data says they apply, with a link to the official accessibility page.
 
-"Add to plan" saves the session ID on your device (localStorage key `focustrack:v1`). Your plan is stored on this device; the Plan page sends your saved session IDs to the schedule service to look up their times and rooms. Notes, quiet-room breaks and settings are not sent, and adding or removing a talk keeps any saved breaks.
+"Add to plan" saves the session ID on your device (localStorage key `focustrack:v1`). On the Plan page, choose "Load saved sessions from schedule service" before the current set of session IDs is sent to look up their times and rooms. Adding a new session ID asks you again. Notes, quiet-room breaks and settings are not sent, and adding or removing a talk keeps any saved breaks.
 
 For demos, `?now=2026-11-10T11:15-07:00` pins a visible "Demo time" banner. Remove the parameter (or use the clear link) to return to the live clock. Unrecognised values are ignored.
 

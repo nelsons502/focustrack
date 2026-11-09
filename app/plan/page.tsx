@@ -1,8 +1,9 @@
 import PlanView from "../../components/plan/PlanView";
 import PrimaryNav from "../../components/plan/PrimaryNav";
-
-const SCHEDULE_SOURCE_URL =
-  "https://sessionize.com/api/v2/uo948i5p/view/markdown";
+import {
+  SCHEDULE_CREDIT,
+  SCHEDULE_SOURCE_URL,
+} from "../../lib/contract";
 
 export default function PlanPage() {
   return (
@@ -18,7 +19,7 @@ export default function PlanPage() {
       </header>
       <PlanView />
       <footer className="credit">
-        <a href={SCHEDULE_SOURCE_URL}>Schedule data: CNCF / Sessionize</a>
+        <a href={SCHEDULE_SOURCE_URL}>{SCHEDULE_CREDIT}</a>
       </footer>
     </main>
   );

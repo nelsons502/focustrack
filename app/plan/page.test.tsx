@@ -4,6 +4,7 @@ import {
   createDefaultLocalState,
   updateLocalState,
 } from "../../lib/client/local-state";
+import { SCHEDULE_CREDIT, SCHEDULE_SOURCE_URL } from "../../lib/contract";
 import PlanPage from "./page";
 
 beforeEach(() => {
@@ -23,10 +24,10 @@ describe("PlanPage", () => {
       screen.getByRole("heading", { level: 1, name: "Your plan" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Schedule data: CNCF / Sessionize" }),
+      screen.getByRole("link", { name: SCHEDULE_CREDIT }),
     ).toHaveAttribute(
       "href",
-      "https://sessionize.com/api/v2/uo948i5p/view/markdown",
+      SCHEDULE_SOURCE_URL,
     );
   });
 

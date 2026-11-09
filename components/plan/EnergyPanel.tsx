@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { QUIET_ROOM_260A } from "../../lib/contract";
 import type {
   EnergyResult,
@@ -123,6 +124,9 @@ export default function EnergyPanel({
   onAddBreak,
   onSettingsChange,
 }: EnergyPanelProps) {
+  const [numericDrafts, setNumericDrafts] = useState<
+    Partial<Record<NumericEnergyKey, string>>
+  >({});
   const dropSession =
     result.suggestion?.kind === "drop" && result.suggestion.sessionId
       ? sessions.find((session) => session.id === result.suggestion?.sessionId)
@@ -153,11 +157,20 @@ export default function EnergyPanel({
   );
 
   function handleNumericChange(key: NumericEnergyKey, raw: string) {
+    if (raw === "") {
+      setNumericDrafts((current) => ({ ...current, [key]: "" }));
+      return;
+    }
     const bounds = ENERGY_SETTING_BOUNDS[key];
     const parsed = Number(raw);
     const value = Number.isFinite(parsed)
       ? Math.min(bounds.max, Math.max(bounds.min, parsed))
       : bounds.min;
+    setNumericDrafts((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
     onSettingsChange({ ...settings, [key]: value });
   }
 
@@ -236,7 +249,7 @@ export default function EnergyPanel({
                   min={bounds.min}
                   max={bounds.max}
                   step={bounds.step}
-                  value={settings[field.key]}
+                  value={numericDrafts[field.key] ?? settings[field.key]}
                   aria-describedby={hintId}
                   onChange={(event) =>
                     handleNumericChange(field.key, event.target.value)
