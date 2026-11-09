@@ -164,6 +164,18 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
     return saved;
   }
 
+  // A session transition must save its draft and close its session-scoped drawer.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (draft.sessionId && current?.id !== draft.sessionId) {
+      saveDraft();
+      if (notesOpen) toggleRef.current?.focus();
+      setNotesOpen(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   function closeNotes() {
     saveDraft();
     setNotesOpen(false);

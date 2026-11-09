@@ -174,6 +174,25 @@ describe("NowScreen", () => {
     expect(screen.getByRole("button", { name: "Quick notes" })).toHaveFocus();
   });
 
+  it("autosaves an unsent line and closes notes when its session ends", async () => {
+    seedPlan(["cur", "nxt"]);
+    mockSessions([current, next]);
+    const { rerender } = render(<NowScreen nowParam={DEMO} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
+    fireEvent.change(screen.getByLabelText(/One line/), {
+      target: { value: "ask about the next session" },
+    });
+
+    rerender(<NowScreen nowParam="2026-11-10T11:50-07:00" />);
+
+    expect(await screen.findByText("Session nxt")).toBeInTheDocument();
+    expect(getLocalStateSnapshot().notes.cur.map((note) => note.text)).toEqual([
+      "ask about the next session",
+    ]);
+    expect(screen.queryByLabelText(/One line/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Quick notes" })).toHaveFocus();
+  });
+
   it("keeps the transition note during a break after the previous session", async () => {
     seedPlan(["cur", "nxt"]);
     mockSessions([current, next]);
