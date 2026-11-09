@@ -47,7 +47,7 @@ describe("AppNav", () => {
     act(() => onChange?.({ matches: true } as MediaQueryListEvent));
 
     document.body.removeAttribute("tabindex");
-    expect(screen.getByRole("link", { name: "Find" })).toHaveFocus();
+    expect(screen.getByRole("link", { name: "Plan" })).toHaveFocus();
   });
 
   it("makes page content inert while open", () => {
