@@ -24,6 +24,26 @@ const filters = [
   { bool: { must_not: [{ terms: { restrictions: ["sold-out", "separate-registration", "all-access-pass"] } }] } },
 ];
 
+const malformedSources = [
+  ["missing speakers", { ...session, speakers: undefined }],
+  ["non-array speakers", { ...session, speakers: "private upstream detail" }],
+  ["null speaker", { ...session, speakers: [null] }],
+  ["missing speaker name", { ...session, speakers: [{ company: "Example" }] }],
+  ["invalid speaker company", { ...session, speakers: [{ name: "Example", company: 42 }] }],
+  ...["id", "eventId", "title", "description", "startsAt", "endsAt", "day", "room",
+    "crowdBasis", "noiseBasis", "sourceUrl", "venue", "level", "roomType", "kind",
+    "restrictions", "crowdEstimate", "noiseEstimate", "captions"].map((key) =>
+    [`missing ${key}`, { ...session, [key]: undefined }] as const),
+  ...["id", "eventId", "title", "description", "startsAt", "endsAt", "day", "room",
+    "crowdBasis", "noiseBasis", "sourceUrl", "venue", "level", "plainSummary"].map((key) =>
+    [`invalid ${key}`, { ...session, [key]: 42 }] as const),
+  ...["roomType", "kind", "crowdEstimate", "noiseEstimate", "captions", "summarySource"].map((key) =>
+    [`invalid ${key}`, { ...session, [key]: "private upstream detail" }] as const),
+  ["non-array restrictions", { ...session, restrictions: "sold-out" }],
+  ["invalid restriction", { ...session, restrictions: ["private upstream detail"] }],
+  ["null source", null],
+] as const;
+
 beforeEach(async () => {
   vi.resetModules();
   vi.resetAllMocks();
@@ -157,5 +177,34 @@ describe("sessions API", () => {
     elastic.mget.mockResolvedValue({ docs: [{ _id: "1", found: true, _source: { speakers: [] } }] });
     const result = await sessions(request("/api/sessions?ids=1"));
     expect(result.status).toBe(503);
+  });
+});
+
+describe("untrusted Elastic sources", () => {
+  it.each(malformedSources)("rejects %s through search and mget with safe 503 responses", async (_label, source) => {
+    elastic.search.mockResolvedValue({ ...response, hits: { hits: [{ _source: source }] } });
+    elastic.mget.mockResolvedValue({ docs: [{ _id: "1", found: true, _source: source }] });
+    for (const path of ["/api/search", "/api/search?q=cluster"]) {
+      const result = await search(request(path));
+      expect(result.status).toBe(503);
+      expect(await result.json()).toEqual({ error: { code: "SEARCH_UNAVAILABLE", message: "Search is temporarily unavailable. Please try again shortly." } });
+    }
+    const result = await sessions(request("/api/sessions?ids=1"));
+    expect(result.status).toBe(503);
+    expect(await result.json()).toEqual({ error: { code: "SESSIONS_UNAVAILABLE", message: "Sessions are temporarily unavailable. Please try again shortly." } });
+  });
+
+  it("preserves nullable metadata and typed summaries while stripping nested internal fields", async () => {
+    const expected: Session = { ...session, venue: null, level: null,
+      restrictions: ["sold-out", "separate-registration", "all-access-pass"],
+      plainSummary: "A reviewed summary.", summarySource: "ai-reviewed" };
+    const source = { ...expected, secretExtra: "internal",
+      speakers: [{ ...session.speakers[0], secretExtra: "internal" }] };
+    elastic.search.mockResolvedValue({ ...response, hits: { hits: [{ _source: source }] } });
+    elastic.mget.mockResolvedValue({ docs: [{ _id: "1", found: true, _source: source }] });
+    const searchResult = await search(request("/api/search?q=cluster"));
+    expect(await searchResult.json()).toEqual({ results: [expected], mode: "hybrid", tookMs: expect.any(Number) });
+    const sessionsResult = await sessions(request("/api/sessions?ids=1"));
+    expect(await sessionsResult.json()).toEqual([expected]);
   });
 });

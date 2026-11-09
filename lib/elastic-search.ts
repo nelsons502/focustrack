@@ -24,18 +24,63 @@ function parameter(params: URLSearchParams, name: string): string | null {
   return params.get(name);
 }
 
-function sessionOnly(source: Partial<Session>): Session {
-  if (typeof source.id !== "string" || typeof source.title !== "string" || !Array.isArray(source.speakers)) {
+function sourceObject(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error("Malformed session source");
   }
-  const session = Object.fromEntries(
-    SESSION_FIELDS.filter((key) => source[key] !== undefined).map((key) => [key, source[key]]),
-  ) as Session;
-  session.speakers = source.speakers.map(({ name, company }) => ({ name, company }));
+  return value as Record<string, unknown>;
+}
+
+function sourceString(value: unknown): string {
+  if (typeof value !== "string") throw new Error("Malformed session source");
+  return value;
+}
+
+function sourceArray(value: unknown): unknown[] {
+  if (!Array.isArray(value)) throw new Error("Malformed session source");
+  return value;
+}
+
+function sourceEnum<const T extends string>(value: unknown, choices: readonly T[]): T {
+  const match = choices.find((choice) => choice === value);
+  if (match === undefined) throw new Error("Malformed session source");
+  return match;
+}
+
+function sessionOnly(value: unknown): Session {
+  const source = sourceObject(value);
+  const session: Session = {
+    id: sourceString(source.id),
+    eventId: sourceString(source.eventId),
+    title: sourceString(source.title),
+    description: sourceString(source.description),
+    speakers: sourceArray(source.speakers).map((value) => {
+      const speaker = sourceObject(value);
+      return { name: sourceString(speaker.name), company: sourceString(speaker.company) };
+    }),
+    startsAt: sourceString(source.startsAt),
+    endsAt: sourceString(source.endsAt),
+    day: sourceString(source.day),
+    room: sourceString(source.room),
+    venue: source.venue === null ? null : sourceString(source.venue),
+    level: source.level === null ? null : sourceString(source.level),
+    roomType: sourceEnum(source.roomType, ["keynote-hall", "ballroom", "breakout", "expo-floor", "other"]),
+    kind: sourceEnum(source.kind, ["talk", "keynote", "panel", "lightning", "demo", "workshop", "community", "colocated", "logistics"]),
+    restrictions: sourceArray(source.restrictions).map((value) =>
+      sourceEnum(value, ["sold-out", "separate-registration", "all-access-pass"])),
+    crowdEstimate: sourceEnum(source.crowdEstimate, ["large", "moderate", "unknown"]),
+    crowdBasis: sourceString(source.crowdBasis),
+    noiseEstimate: sourceEnum(source.noiseEstimate, ["loud", "unknown"]),
+    noiseBasis: sourceString(source.noiseBasis),
+    captions: sourceEnum(source.captions, ["wordly-breakout", "unknown"]),
+    sourceUrl: sourceString(source.sourceUrl),
+  };
+  if (source.plainSummary !== undefined) session.plainSummary = sourceString(source.plainSummary);
+  if (source.summarySource !== undefined) session.summarySource = sourceEnum(source.summarySource, ["ai-reviewed"]);
   return session;
 }
 
-function requireComplete(result: estypes.SearchResponse<Session>): Session[] {
+function requireComplete(result: estypes.SearchResponse<unknown>): Session[] {
   if (result.timed_out || (result._shards?.failed ?? 0) > 0) {
     throw new Error("Incomplete search");
   }
@@ -79,7 +124,7 @@ export async function searchSessions(params: URLSearchParams): Promise<SearchRes
   const client = getElasticClient();
   if (q) {
     try {
-      const result = await client.search<Session>({
+      const result = await client.search<unknown>({
         ...common,
         timeout: "8s",
         retriever: { rrf: { rank_window_size: 60, rank_constant: 60, retrievers: [
@@ -108,7 +153,7 @@ async function lexicalSearch(
   query: estypes.QueryDslQueryContainer,
   started: number,
 ): Promise<SearchResponse> {
-  const result = await client.search<Session>({ ...common, query, timeout: "4s" }, { requestTimeout: 5_000 });
+  const result = await client.search<unknown>({ ...common, query, timeout: "4s" }, { requestTimeout: 5_000 });
   return { results: requireComplete(result), mode: "lexical-fallback", tookMs: elapsed(started) };
 }
 
@@ -120,7 +165,7 @@ export async function getSessionsByIds(params: URLSearchParams): Promise<Session
     throw new ApiInputError("Provide up to 50 valid session IDs separated by commas.");
   }
   const ids = [...new Set(requested)];
-  const result = await getElasticClient().mget<Session>({
+  const result = await getElasticClient().mget<unknown>({
     index: INDEX_NAME, ids, _source: [...SESSION_FIELDS],
   }, { requestTimeout: 5_000 });
   const found = new Map<string, Session>();
