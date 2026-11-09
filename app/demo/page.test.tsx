@@ -38,10 +38,31 @@ describe("DemoPage", () => {
       screen.getByRole("heading", { level: 1, name: "Play my day" }),
     ).toBeInTheDocument();
     expect(screen.getByText(/replaces your current plan/i)).toBeInTheDocument();
+    expect(screen.queryByText(/nothing leaves this device/i)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: SCHEDULE_CREDIT })).toHaveAttribute(
       "href",
       SCHEDULE_SOURCE_URL,
     );
+  });
+
+  it("shows the three steps, Maya's timeline preview, and speeds explained", () => {
+    render(<DemoPage />);
+    expect(
+      screen.getByRole("heading", { name: "What Play my day does" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Loads Maya's Tuesday/i)).toBeInTheDocument();
+    expect(screen.getByText(/Starts demo time/i)).toBeInTheDocument();
+    expect(screen.getByText(/Stays in your hands/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /preview of Maya's Tuesday/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Talk 1")).toBeInTheDocument();
+    expect(screen.getByText("Talk 5")).toBeInTheDocument();
+    expect(screen.getByText("Quiet break")).toBeInTheDocument();
+    expect(screen.getByText(/11:30 AM/)).toBeInTheDocument();
+    expect(screen.getByText(/real time\. One second passes/i)).toBeInTheDocument();
+    expect(screen.getByText(/one minute passes per second/i)).toBeInTheDocument();
+    expect(screen.getByText(/five minutes per second/i)).toBeInTheDocument();
   });
 
   it("loads Maya's plan, starts the clock playing, and goes to Now", () => {
