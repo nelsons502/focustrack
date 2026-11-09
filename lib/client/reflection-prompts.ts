@@ -52,8 +52,9 @@ export function findContrast(
     const after = stripPunctuation(words[i + 1]);
     if (!before || !after) continue;
     if (!isVersus && !(hasUpper(before) && hasUpper(after))) continue;
-    const first = joinTerm(words, i - 1, -1);
     const second = joinTerm(words, i + 1, 1);
+    const firstFull = joinTerm(words, i - 1, -1);
+    const first = second.includes(" ") ? firstFull : stripPunctuation(words[i - 1]);
     if (first.toLowerCase() === second.toLowerCase()) continue;
     return { first, second };
   }

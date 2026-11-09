@@ -55,6 +55,22 @@ describe("ReflectView", () => {
     expect(screen.getByText(/Nothing here is graded or shared/)).toBeInTheDocument();
   });
 
+  it("does not offer the recap while talks are loading", async () => {
+    seed({ plan: { sessionIds: ["s1"], notAttending: [] } });
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => undefined)));
+    await renderFresh();
+    expect(screen.getByText(/Loading your talks/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Night-of recap" })).not.toBeInTheDocument();
+  });
+
+  it("does not offer the recap when talks fail to load", async () => {
+    seed({ plan: { sessionIds: ["s1"], notAttending: [] } });
+    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new Error("offline"))));
+    await renderFresh();
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Night-of recap" })).not.toBeInTheDocument();
+  });
+
   it("shows notes, saves a reflection on the device, and recaps it", async () => {
     seed({
       plan: { sessionIds: ["s1"], notAttending: [] },
