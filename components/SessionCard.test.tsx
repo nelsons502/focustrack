@@ -98,6 +98,12 @@ describe("SessionCard accessibility facts", () => {
     expect(container.textContent).not.toMatch(/\bsmall\b|\bquiet\b(?! room)/i);
   });
 
+  it("shows unknown when an estimate has no basis", () => {
+    renderCard(makeSession({ crowdEstimate: "large", noiseEstimate: "loud" }));
+    expect(screen.getByText("Crowd: unknown")).toBeInTheDocument();
+    expect(screen.getByText("Noise: unknown")).toBeInTheDocument();
+  });
+
   it("shows unknown even if a basis is present without an estimate", () => {
     renderCard(makeSession({ crowdBasis: "ballroom" }));
     expect(screen.getByText("Crowd: unknown")).toBeInTheDocument();
@@ -123,11 +129,11 @@ describe("SessionCard interactions", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("omits the toggle for short descriptions", () => {
+  it("offers expansion even for short descriptions", () => {
     renderCard(makeSession({ description: "Short." }));
     expect(
-      screen.queryByRole("button", { name: /full description/ }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: "Show full description" }),
+    ).toBeInTheDocument();
   });
 
   it("reflects plan state with aria-pressed", () => {

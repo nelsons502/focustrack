@@ -38,8 +38,6 @@ const NOISE_LABELS: Record<Session["noiseEstimate"], string> = {
   unknown: "unknown",
 };
 
-const LONG_DESCRIPTION = 140;
-
 function estimateText(
   name: string,
   label: string,
@@ -47,7 +45,7 @@ function estimateText(
   basis: string,
 ): string {
   const trimmed = basis.trim();
-  if (estimate === "unknown" || !trimmed) return `${name}: ${label}`;
+  if (estimate === "unknown" || !trimmed) return `${name}: unknown`;
   return `${name}: ${label} (estimate: ${trimmed})`;
 }
 
@@ -118,8 +116,7 @@ export default function SessionCard({
           >
             {description}
           </p>
-          {description.length > LONG_DESCRIPTION ? (
-            <button
+          <button
               type="button"
               className="button button-quiet"
               aria-expanded={expanded}
@@ -128,7 +125,6 @@ export default function SessionCard({
             >
               {expanded ? "Hide full description" : "Show full description"}
             </button>
-          ) : null}
         </>
       ) : null}
       <ul className="card-facts">
