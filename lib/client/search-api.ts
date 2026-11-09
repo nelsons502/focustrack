@@ -146,16 +146,29 @@ export async function fetchSearch(
   };
 }
 
+const SESSION_BATCH_SIZE = 50;
+
 export async function fetchSessionsByIds(
   ids: string[],
   signal: AbortSignal,
 ): Promise<Session[]> {
-  const unique = [...new Set(ids)].slice(0, 50);
-  if (unique.length === 0) return [];
+  const unique = [...new Set(ids)];
+  const batches: string[][] = [];
+  for (let i = 0; i < unique.length; i += SESSION_BATCH_SIZE) {
+    batches.push(unique.slice(i, i + SESSION_BATCH_SIZE));
+  }
+  const loaded = await Promise.all(batches.map((batch) => fetchSessionBatch(batch, signal)));
+  return loaded.flat();
+}
+
+async function fetchSessionBatch(
+  ids: string[],
+  signal: AbortSignal,
+): Promise<Session[]> {
   const message = "Your sessions could not be loaded. Please try again shortly.";
   let response: Response;
   try {
-    response = await fetch(`/api/sessions?ids=${unique.map(encodeURIComponent).join(",")}`, {
+    response = await fetch(`/api/sessions?ids=${ids.map(encodeURIComponent).join(",")}`, {
       signal,
       headers: { Accept: "application/json" },
     });

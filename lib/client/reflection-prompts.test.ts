@@ -61,3 +61,12 @@ describe("title contrast", () => {
     expect(prompts[3]).toContain("Helm and Kustomize");
   });
 });
+
+describe("lowercase versus", () => {
+  it("handles names like eBPF vs iptables", () => {
+    expect(findContrast("We compare eBPF vs iptables for filtering.")).toEqual({
+      first: "eBPF",
+      second: "iptables",
+    });
+  });
+});

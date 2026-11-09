@@ -7,6 +7,7 @@ export type ReflectionPrompts = {
 
 const TERM = String.raw`[A-Z][\w.+-]*(?: [A-Z][\w.+-]*)?`;
 const VERSUS = new RegExp(`(${TERM})\\s+(?:vs\\.?|versus)\\s+(${TERM})`);
+const VERSUS_LOWER = /(?:^|\s)([A-Za-z][\w.+-]*)\s+(?:vs\.?|versus)\s+([A-Za-z][\w.+-]*)/;
 // Plain "or" is far noisier than "vs", so only a single capitalised word on each side counts.
 const OR_PAIR = /\b([A-Z][\w.+-]*) or ([A-Z][\w.+-]*)\b/;
 
@@ -18,7 +19,7 @@ export function findContrast(
   description: string,
 ): { first: string; second: string } | null {
   const text = clean(description);
-  const match = VERSUS.exec(text) ?? OR_PAIR.exec(text);
+  const match = VERSUS.exec(text) ?? VERSUS_LOWER.exec(text) ?? OR_PAIR.exec(text);
   if (!match) return null;
   const first = match[1].trim();
   const second = match[2].trim();
