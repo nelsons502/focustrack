@@ -1,5 +1,6 @@
 import ExportCalendarButton from "../components/ExportCalendarButton";
 import FindSearch from "../components/FindSearch";
+import NowLink from "../components/NowLink";
 import ReflectLink from "../components/ReflectLink";
 import PrimaryNav from "../components/plan/PrimaryNav";
 
@@ -18,9 +19,7 @@ export default function HomePage() {
         </p>
       </header>
       <p className="now-link-row">
-        <a className="now-link" href="/now">
-          Open the Now screen: what is on, and what is next
-        </a>
+        <NowLink />
       </p>
       <FindSearch />
       <ExportCalendarButton />

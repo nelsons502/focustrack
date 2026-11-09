@@ -40,8 +40,9 @@ describe("PlanPage", () => {
     const plan = screen.getByRole("link", { name: "Plan" });
     expect(plan).toHaveAttribute("href", "/plan");
     expect(plan).toHaveAttribute("aria-current", "page");
-    expect(
-      screen.queryByRole("link", { name: "Now" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Now" })).toHaveAttribute(
+      "href",
+      "/now",
+    );
   });
 });

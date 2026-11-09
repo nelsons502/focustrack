@@ -1,4 +1,5 @@
 import ReflectView from "../../components/ReflectView";
+import PrimaryNav from "../../components/plan/PrimaryNav";
 import "./reflect.css";
 
 const SCHEDULE_SOURCE_URL =
@@ -7,6 +8,10 @@ const SCHEDULE_SOURCE_URL =
 export default function ReflectPage() {
   return (
     <main id="main" tabIndex={-1} className="shell">
+      <header className="masthead">
+        <p className="app-name">FocusTrack</p>
+        <PrimaryNav current="reflect" />
+      </header>
       <ReflectView />
       <footer className="credit">
         <a href={SCHEDULE_SOURCE_URL}>Schedule data: CNCF / Sessionize</a>
