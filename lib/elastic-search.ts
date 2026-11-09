@@ -11,6 +11,8 @@ import {
   type SessionKind,
 } from "./contract";
 import { createElasticClient } from "./elastic";
+import { descriptionHash } from "./auto-summary";
+import { passesGuardrail } from "./summary-guardrail";
 import { traceElasticOperation } from "./telemetry/trace-elastic.ts";
 
 let cachedClient: Client | undefined;
@@ -24,6 +26,7 @@ const SESSION_FIELDS = [
   "day", "room", "venue", "level", "roomType", "kind", "restrictions",
   "crowdEstimate", "crowdBasis", "noiseEstimate", "noiseBasis", "captions",
   "plainSummary", "summarySource", "sourceUrl",
+  "autoSummary", "autoSummaryAt", "autoSummaryModel", "descriptionHash",
 ] as const satisfies readonly (keyof Session)[];
 
 const ROOM_TYPES = ["keynote-hall", "ballroom", "breakout", "expo-floor", "other"] as const satisfies readonly RoomType[];
@@ -107,6 +110,12 @@ function sessionOnly(value: unknown): Session {
   };
   if (source.plainSummary !== undefined) session.plainSummary = sourceString(source.plainSummary);
   if (source.summarySource !== undefined) session.summarySource = sourceEnum(source.summarySource, SUMMARY_SOURCES);
+  const autoSummary = typeof source.autoSummary === "string" ? source.autoSummary.trim() : undefined;
+  if (autoSummary && source.descriptionHash === descriptionHash(session.description) && passesGuardrail(autoSummary, session)) {
+    session.autoSummary = autoSummary;
+    if (typeof source.autoSummaryAt === "string") session.autoSummaryAt = source.autoSummaryAt;
+    if (typeof source.autoSummaryModel === "string") session.autoSummaryModel = source.autoSummaryModel;
+  }
   return session;
 }
 

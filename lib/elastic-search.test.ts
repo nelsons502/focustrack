@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { descriptionHash } from "./auto-summary";
 import type { Session } from "./contract";
 
 const elastic = vi.hoisted(() => ({ search: vi.fn(), mget: vi.fn(), close: vi.fn() }));
@@ -192,6 +193,18 @@ describe("untrusted Elastic sources", () => {
     const result = await sessions(request("/api/sessions?ids=1"));
     expect(result.status).toBe(503);
     expect(await result.json()).toEqual({ error: { code: "SESSIONS_UNAVAILABLE", message: "Sessions are temporarily unavailable. Please try again shortly." } });
+  });
+
+  it("returns an automatic summary only when it is current and passes the guardrail", async () => {
+    const current = descriptionHash(session.description);
+    const good = { ...session, autoSummary: `This talk covers ${session.title}.`, autoSummaryAt: "2026-11-09T20:00:00Z", autoSummaryModel: "m", descriptionHash: current };
+    const stale = { ...good, id: "2", descriptionHash: "stale" };
+    const invented = { ...good, id: "3", autoSummary: "This talk is run by Zorblax engineers." };
+    elastic.search.mockResolvedValue({ ...response, hits: { hits: [{ _source: good }, { _source: stale }, { _source: invented }] } });
+    const body = await (await search(request("/api/search?q=cluster"))).json();
+    expect(body.results[0]).toEqual({ ...session, autoSummary: good.autoSummary, autoSummaryAt: good.autoSummaryAt, autoSummaryModel: "m" });
+    expect(body.results[1]).not.toHaveProperty("autoSummary");
+    expect(body.results[2]).not.toHaveProperty("autoSummary");
   });
 
   it("preserves nullable metadata and typed summaries while stripping nested internal fields", async () => {

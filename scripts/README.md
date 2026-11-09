@@ -32,3 +32,11 @@ Schedule data: CNCF / Sessionize.
 ## Judge explanation
 
 FocusTrack reads the public conference schedule and removes routine logistics. It adds descriptions, speakers, local times, and attendance restrictions, then stores each session in Elastic. Elastic prepares those descriptions for meaning-based search, so attendees can find relevant talks without knowing the exact keywords.
+
+## Automatic summaries and scheduled sync
+
+`npm run setup-auto-summary` (run once, locally, with `OPENAI_API_KEY` and optional `OPENAI_SUMMARY_MODEL` in the environment) creates the Elastic inference endpoint `focustrack-openai-summary`, adds four additive mappings (`autoSummary`, `autoSummaryAt`, `autoSummaryModel`, `descriptionHash`), and saves the ingest pipeline `focustrack-auto-summary`. Elastic stores the OpenAI key inside the endpoint; nothing else needs it.
+
+`npm run sync` re-reads the Sessionize schedule, upserts only new or changed sessions by ID with partial updates (never deletes, never touches summary fields), then runs the pipeline on sessions that need a summary: no reviewed `plainSummary`, and no automatic summary yet or a changed description hash. The pipeline re-checks those rules inside Elastic and leaves a document untouched if OpenAI fails. `--dry-run` reports counts without writing. In Kubernetes, `deploy/sync-cronjob.yaml` runs it every 30 minutes. If the pipeline is not set up, sync still updates the schedule and skips summaries.
+
+The API and session card show an automatic summary only when it matches the current description and passes `lib/summary-guardrail.ts`: at most two sentences and 320 characters, and no number, name, acronym or URL that is not in the session's title or description. Reviewed summaries always win and are labelled as reviewed.

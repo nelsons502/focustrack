@@ -1,0 +1,73 @@
+# Re-syncs the Sessionize schedule into Elastic every 30 minutes. Summaries are
+# written by Elastic's ingest pipeline, which holds the OpenAI key itself, so this
+# Job only needs the Elastic credentials.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: schedule-sync
+  namespace: team-focustrack
+  labels:
+    app: schedule-sync
+spec:
+  schedule: "*/30 * * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 600
+      ttlSecondsAfterFinished: 3600
+      template:
+        metadata:
+          labels:
+            app: schedule-sync
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          volumes:
+            - name: tmp
+              emptyDir:
+                sizeLimit: 64Mi
+          containers:
+            - name: sync
+              image: app
+              workingDir: /app/sync
+              command: ["node", "--experimental-strip-types", "--no-warnings", "scripts/sync.ts"]
+              env:
+                - name: SYNC_CACHE_DIR
+                  value: /tmp/sessionize-cache
+                - name: ES_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-credentials
+                      key: es-url
+                - name: ES_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-credentials
+                      key: es-api-key
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 96Mi
+                limits:
+                  cpu: 250m
+                  memory: 256Mi
+              securityContext:
+                runAsNonRoot: true
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp

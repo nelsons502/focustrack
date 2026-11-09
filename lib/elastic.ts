@@ -1,6 +1,7 @@
 import { Client } from '@elastic/elasticsearch';
 import type { estypes } from '@elastic/elasticsearch';
 import { INDEX_NAME, type Session } from './contract.ts';
+import { autoSummaryMappings } from './auto-summary.ts';
 
 export const sessionsMapping: estypes.MappingTypeMapping = {
   properties: {
@@ -14,6 +15,7 @@ export const sessionsMapping: estypes.MappingTypeMapping = {
     kind: {type:'keyword'}, restrictions: {type:'keyword'}, crowdEstimate: {type:'keyword'},
     crowdBasis: {type:'keyword'}, noiseEstimate: {type:'keyword'}, noiseBasis: {type:'keyword'}, captions: {type:'keyword'},
     plainSummary: {type:'text'}, summarySource: {type:'keyword'}, sourceUrl: {type:'keyword'},
+    ...autoSummaryMappings,
   },
 };
 

@@ -10,7 +10,9 @@
     "build": "next build",
     "start": "next start",
     "ingest": "node --experimental-strip-types scripts/ingest.ts",
-    "apply-summaries": "node --experimental-strip-types scripts/apply-summaries.ts"
+    "apply-summaries": "node --experimental-strip-types scripts/apply-summaries.ts",
+    "setup-auto-summary": "node --experimental-strip-types scripts/setup-auto-summary.ts",
+    "sync": "node --experimental-strip-types scripts/sync.ts"
   },
   "dependencies": {
     "@elastic/elasticsearch": "^9.5.1",
