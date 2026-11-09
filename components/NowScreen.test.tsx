@@ -216,4 +216,22 @@ describe("NowScreen", () => {
     expect(getLocalStateSnapshot().notes.a).toEqual([]);
     expect(getLocalStateSnapshot().notes.b.map((n) => n.text)).toEqual(["b note"]);
   });
+
+  it("disables undo when opening notes for a different session", async () => {
+    const a = makeSession("a", "10:30", "11:30");
+    const b = makeSession("b", "11:30", "12:30");
+    seedPlan(["a", "b"]);
+    mockSessions([a, b]);
+    const view = render(<NowScreen nowParam="2026-11-10T11:25-07:00" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Quick notes" }));
+    fireEvent.change(screen.getByLabelText(/One line/), { target: { value: "a note" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close notes" }));
+    view.rerender(<NowScreen nowParam="2026-11-10T11:31-07:00" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Quick notes" }));
+    expect(screen.getByRole("group", { name: "Notes for Session b" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Undo last note" })).toBeDisabled();
+    expect(getLocalStateSnapshot().notes.a.map((note) => note.text)).toEqual(["a note"]);
+  });
 });

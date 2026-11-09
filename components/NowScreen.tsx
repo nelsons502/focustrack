@@ -153,7 +153,9 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   const targetNotes = noteTarget ? (localState.notes[noteTarget.id] ?? []) : [];
   const recentNotes = targetNotes.slice(-NOTES_SHOWN).reverse();
   const canUndoNote =
-    lastSavedFor !== null && (localState.notes[lastSavedFor]?.length ?? 0) > 0;
+    lastSavedFor !== null &&
+    lastSavedFor === noteTarget?.id &&
+    (localState.notes[lastSavedFor]?.length ?? 0) > 0;
 
   function saveDraft(): boolean | null {
     if (!draft.sessionId || !draft.text.trim()) return null;
@@ -357,6 +359,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
                 if (notesOpen) {
                   closeNotes();
                 } else {
+                  if (current?.id !== notesSession?.id) setLastSavedFor(null);
                   setNotesSession(current);
                   setNotesOpen(true);
                 }
