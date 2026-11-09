@@ -16,6 +16,15 @@ const URL_PATTERN = /\b(?:https?:\/\/|www\.)[^\s<>"')]+/gi;
 const WORD_PATTERN = /(?<![\p{L}\p{N}])-?\p{N}+(?:[.,:/]\p{N}+)*%?|[\p{L}\p{N}]+/gu;
 const SENTENCE_BREAK = /(?<=[.!?]["'”’)\]]*)\s+/;
 
+const ACCESSIBILITY_TERMS = [
+  'captions', 'caption', 'CART', 'ASL', 'sign language', 'interpreter', 'step-free', 'wheelchair',
+  'accessibility', 'accessible', 'quiet', 'sensory', 'hearing loop', 'reserved seating',
+];
+
+function termPattern(term: string): RegExp {
+  return new RegExp(`(?<![\\p{L}\\p{N}])${term.replace(/[-\s]/g, '[-\\s]')}(?![\\p{L}\\p{N}])`, 'iu');
+}
+
 function words(text: string): string[] {
   return text.match(WORD_PATTERN) ?? [];
 }
@@ -32,6 +41,10 @@ export function checkSummary(summary: string, source: SummarySource): GuardrailR
   const sourceUrls = new Set(urls(sourceText));
   for (const url of urls(text)) {
     if (!sourceUrls.has(url)) return { ok: false, reason: `unsupported URL: ${url}` };
+  }
+  for (const term of ACCESSIBILITY_TERMS) {
+    const pattern = termPattern(term);
+    if (pattern.test(text) && !pattern.test(sourceText)) return { ok: false, reason: `unsupported accessibility claim: ${term}` };
   }
   const withoutUrls = text.replace(URL_PATTERN, 'link');
   const sentences = withoutUrls.split(SENTENCE_BREAK).filter(sentence => sentence.trim());

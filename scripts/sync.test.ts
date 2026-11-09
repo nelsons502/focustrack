@@ -3,7 +3,7 @@ import type { Session } from '../lib/contract.ts';
 import { isMissingPipeline, parseSyncOptions, selectSyncWork } from './sync.ts';
 
 it('parses sync options and rejects unknown flags', () => {
-  expect(parseSyncOptions([])).toEqual({ dryRun: false, summaryLimit: 600, detailBudget: 120 });
+  expect(parseSyncOptions([])).toEqual({ dryRun: false, summaryLimit: 100, detailBudget: 120 });
   expect(parseSyncOptions(['--dry-run', '--summary-limit=5', '--detail-budget=0'])).toEqual({ dryRun: true, summaryLimit: 5, detailBudget: 0 });
   expect(() => parseSyncOptions(['--delete'])).toThrow(/Unknown/);
 });

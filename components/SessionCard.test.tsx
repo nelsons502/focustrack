@@ -156,7 +156,7 @@ describe("SessionCard interactions", () => {
 describe("SessionCard summaries", () => {
   it("prefers the reviewed summary and labels it", () => {
     renderCard(makeSession({ plainSummary: "A reviewed summary.", autoSummary: "This talk covers Kubernetes basics." }));
-    expect(screen.getByText("Plain-language summary (reviewed):")).toBeInTheDocument();
+    expect(screen.getByText("AI summary (reviewed):")).toBeInTheDocument();
     expect(screen.queryByText(/AI summary \(automatic, not reviewed\)/)).not.toBeInTheDocument();
   });
 

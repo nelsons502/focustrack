@@ -85,3 +85,14 @@ describe('summary guardrail', () => {
     expect(passesGuardrail('This talk covers a 10-20 node range.', numbers)).toBe(true);
   });
 });
+
+describe('accessibility claims', () => {
+  it.each(['This talk offers live captions for everyone.', 'This talk runs in a quiet room.'])('rejects %s when the source never mentions it', summary => {
+    expect(checkSummary(summary, source).ok).toBe(false);
+  });
+
+  it('allows the term when the source mentions it', () => {
+    const withTerms = { title: source.title, description: `${source.description} Live captions and a quiet room are provided.` };
+    expect(checkSummary('This talk offers live captions in a quiet room.', withTerms)).toEqual({ ok: true });
+  });
+});

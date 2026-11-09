@@ -111,7 +111,7 @@ export default function SessionCard({
       ) : null}
       {session.plainSummary?.trim() ? (
         <p className="card-summary">
-          <strong>Plain-language summary (reviewed):</strong>{" "}
+          <strong>AI summary (reviewed):</strong>{" "}
           {session.plainSummary.trim()}
         </p>
       ) : passesGuardrail(session.autoSummary, session) ? (

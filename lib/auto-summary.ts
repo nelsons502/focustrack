@@ -12,6 +12,25 @@ export const SUMMARY_INSTRUCTIONS = [
   'No URLs, no hype, no markdown, no quotation marks. Reply with the summary only.',
 ].join(' ');
 
+export type RunLimits = { maxDetailFetches: number; maxSummaries: number; deadlineSeconds: number };
+
+function nonNegativeInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return value !== undefined && value.trim() !== '' && Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+export function runLimitsFromEnv(env: Record<string, string | undefined>): RunLimits {
+  return {
+    maxDetailFetches: nonNegativeInteger(env.SYNC_MAX_DETAIL_FETCHES, 120),
+    maxSummaries: nonNegativeInteger(env.SYNC_MAX_SUMMARIES, 100),
+    deadlineSeconds: nonNegativeInteger(env.SYNC_DEADLINE_SECONDS, 480),
+  };
+}
+
+export function capWork<T>(items: readonly T[], max: number): { run: T[]; deferred: T[] } {
+  return { run: items.slice(0, max), deferred: items.slice(max) };
+}
+
 export type SummaryState = {
   plainSummary?: unknown;
   autoSummary?: unknown;

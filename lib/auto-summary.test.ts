@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Session } from './contract.ts';
 import {
-  descriptionHash, needsAutoSummary, selectDetailIds, sessionChanged, syncOperations, withStoredDetails,
+  capWork, descriptionHash, needsAutoSummary, runLimitsFromEnv, selectDetailIds, sessionChanged, syncOperations, withStoredDetails,
 } from './auto-summary.ts';
 
 function session(id: string, extra: Partial<Session> = {}): Session {
@@ -86,5 +86,20 @@ describe('detail refresh selection', () => {
     expect(merged.description).toBe('Stored.');
     expect(merged.speakers).toEqual([{ name: 'Ana', company: 'Acme' }]);
     expect(withStoredDetails(listed, { description: 'Stored.', speakers: 'bad' })).toBe(listed);
+  });
+});
+
+describe('per-run caps', () => {
+  it('defaults to 120 detail fetches, 100 summaries and a 480 second deadline, overridable by env', () => {
+    expect(runLimitsFromEnv({})).toEqual({ maxDetailFetches: 120, maxSummaries: 100, deadlineSeconds: 480 });
+    expect(runLimitsFromEnv({ SYNC_MAX_DETAIL_FETCHES: '5', SYNC_MAX_SUMMARIES: '7', SYNC_DEADLINE_SECONDS: 'x' }))
+      .toEqual({ maxDetailFetches: 5, maxSummaries: 7, deadlineSeconds: 480 });
+  });
+
+  it('splits work into what runs now and what is deferred', () => {
+    const ids = Array.from({ length: 130 }, (_, i) => String(i));
+    const { run, deferred } = capWork(ids, 120);
+    expect(run).toHaveLength(120);
+    expect(deferred).toEqual(ids.slice(120));
   });
 });

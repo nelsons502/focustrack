@@ -5,14 +5,14 @@ import { createElasticClient } from '../lib/elastic.ts';
 import { parseSessionize } from '../lib/parse-sessionize.ts';
 import { checkSummary } from '../lib/summary-guardrail.ts';
 import {
-  AUTO_SUMMARY_PIPELINE, type StoredVersion, descriptionHash, needsAutoSummary, selectDetailIds, sessionChanged, syncOperations, withStoredDetails,
+  AUTO_SUMMARY_PIPELINE, type StoredVersion, capWork, runLimitsFromEnv, descriptionHash, needsAutoSummary, selectDetailIds, sessionChanged, syncOperations, withStoredDetails,
 } from '../lib/auto-summary.ts';
 import { createMarkdownFetcher, source } from './ingest.ts';
 
 export type SyncOptions = { dryRun: boolean; summaryLimit: number; detailBudget: number };
 
 export function parseSyncOptions(args: string[]): SyncOptions {
-  const options: SyncOptions = { dryRun: false, summaryLimit: 600, detailBudget: 120 };
+  const options: SyncOptions = { dryRun: false, summaryLimit: 100, detailBudget: 120 };
   for (const arg of args) {
     const numeric = /^--(summary-limit|detail-budget)=(\d+)$/.exec(arg);
     if (arg === '--dry-run') options.dryRun = true;
@@ -70,9 +70,10 @@ export function isMissingPipeline(error: unknown): boolean {
   return error instanceof Error && /pipeline with id \[[^\]]+\] does not exist/i.test(error.message);
 }
 
-async function summarize(client: Client, ids: string[]): Promise<number | 'skipped'> {
+async function summarize(client: Client, ids: string[], stop: () => boolean = () => false): Promise<number | 'skipped'> {
   let failures = 0;
   for (let offset = 0; offset < ids.length; offset += 10) {
+    if (stop()) { console.log(`Deadline reached; ${ids.length - offset} summaries deferred to the next run.`); break; }
     let result;
     try {
       result = await client.updateByQuery({
@@ -98,20 +99,33 @@ export async function main(): Promise<void> {
     const listed = parseSessionize(list);
     const { sources: stored, versions } = await storedSessions(client);
     const { listedNow, detailIds } = selectSyncWork(listed, stored, options.detailBudget, Math.floor(Date.now() / 1_800_000));
+    const limits = runLimitsFromEnv(process.env);
+    const startedAt = Date.now();
+    const pastDeadline = () => Date.now() - startedAt >= limits.deadlineSeconds * 1000;
+    const detailCap = capWork([...detailIds], limits.maxDetailFetches);
+    let detailsDeferred = detailCap.deferred.length;
     const details: Record<string, string> = {};
-    for (const id of detailIds) details[id] = await fetchMarkdown(`sessions/${id}.md`, `${source}/session/${id}`);
+    const fetchedIds = new Set<string>();
+    for (const id of detailCap.run) {
+      if (pastDeadline()) { detailsDeferred++; continue; }
+      details[id] = await fetchMarkdown(`sessions/${id}.md`, `${source}/session/${id}`);
+      fetchedIds.add(id);
+    }
+    if (detailsDeferred) console.log(`Deferred ${detailsDeferred} detail pages to the next run (cap ${limits.maxDetailFetches}, deadline ${limits.deadlineSeconds}s).`);
     const listedNowIds = new Set(listedNow.map(session => session.id));
     const sessions = parseSessionize(list, details).filter(session => listedNowIds.has(session.id))
-      .map(session => detailIds.has(session.id) ? session : withStoredDetails(session, stored.get(session.id)));
+      .map(session => fetchedIds.has(session.id) ? session : withStoredDetails(session, stored.get(session.id)));
     const changed = sessions.filter(session => sessionChanged(stored.get(session.id), session));
-    const candidates = sessions.filter(session => needsAutoSummary(stored.get(session.id), session.description)).slice(0, options.summaryLimit);
-    console.log(`Fetched ${sessions.length} sessions (${detailIds.size} detail pages checked); ${changed.length} new or changed; ${candidates.length} need an automatic summary.`);
+    const needing = sessions.filter(session => needsAutoSummary(stored.get(session.id), session.description));
+    const candidates = pastDeadline() ? [] : capWork(needing, Math.min(options.summaryLimit, limits.maxSummaries)).run;
+    if (needing.length > candidates.length) console.log(`Deferred ${needing.length - candidates.length} summaries to the next run (cap ${limits.maxSummaries}, deadline ${limits.deadlineSeconds}s).`);
+    console.log(`Fetched ${sessions.length} sessions (${fetchedIds.size} detail pages fetched); ${changed.length} new or changed; ${candidates.length} need an automatic summary.`);
     if (options.dryRun) { console.log('Dry run: nothing was written.'); return; }
     const { written, conflicts } = changed.length ? await upsert(client, changed, versions) : { written: 0, conflicts: [] };
     if (conflicts.length) console.log(`Skipped ${conflicts.length} sessions changed by another writer during sync; the next run retries them: ${conflicts.join(', ')}`);
     const conflicted = new Set(conflicts);
     const summarizeIds = candidates.filter(session => !conflicted.has(session.id));
-    const failures = summarizeIds.length ? await summarize(client, summarizeIds.map(session => session.id)) : 0;
+    const failures = summarizeIds.length ? await summarize(client, summarizeIds.map(session => session.id), pastDeadline) : 0;
     if (failures === 'skipped') {
       console.log(`Sync done: fetched ${sessions.length}, changed ${written}/${changed.length}; summaries skipped because pipeline ${AUTO_SUMMARY_PIPELINE} is not set up (run npm run setup-auto-summary). Nothing was deleted.`);
       return;
