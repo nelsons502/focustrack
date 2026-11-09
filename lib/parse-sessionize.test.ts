@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { EVENT_ID } from './contract.ts';
 import { parseSessionize } from './parse-sessionize.ts';
 const schedule = readFileSync(join(process.cwd(), 'lib/__fixtures__/schedule.md'), 'utf8');
 const detail = readFileSync(join(process.cwd(), 'lib/__fixtures__/session.md'), 'utf8');
@@ -9,7 +10,7 @@ describe('Sessionize real Markdown excerpts', () => {
   it('uses local ISO times, room metadata, description and speaker affiliation', () => {
     const session = parseSessionize(schedule, { '1227395': detail }).find(s => s.id === '1227395');
     expect(session).toEqual({
-      id: '1227395', eventId: 'kccncna2026',
+      id: '1227395', eventId: EVENT_ID,
       title: 'Why We Bet the Data Platform on Kubernetes - And How AI Is Changing How We Operate It',
       description: 'Kubernetes has quietly become the default substrate for petabyte-scale data processing. Salesforce, Pinterest, Airbnb, and Apple all run native Spark, Flink, Trino, StarRocks, and Iceberg on Kubernetes at a scale the platform was never designed for.',
       speakers: [{ name: 'Vara Bonthu', company: 'AWS, Principal Technologist, OSS - Data, AI and Kubernetes' }],
@@ -118,6 +119,16 @@ it('uses the keynote venue proxy even for a non-keynote title', () => {
 
 it('measures lightning duration across midnight', () => {
   expect(parseSessionize(entry('Talk', 'Online', '12:05 am', '11:55 pm'))[0].kind).toBe('lightning');
+});
+
+it('uses the supplied UTC offset for session timestamps, including overnight ends', () => {
+  expect(parseSessionize(entry('Talk', 'Online', '12:05 am', '11:55 pm'), {}, '+02:30')[0]).toMatchObject({
+    startsAt: '2026-11-10T23:55:00+02:30', endsAt: '2026-11-11T00:05:00+02:30',
+  });
+});
+
+it('rejects an invalid event UTC offset', () => {
+  expect(() => parseSessionize(entry('Talk'), {}, 'UTC')).toThrow('Invalid event UTC offset');
 });
 
 it('recognizes a venue used by keynotes across the schedule', () => {

@@ -1,6 +1,6 @@
 import { Client } from '@elastic/elasticsearch';
 import type { estypes } from '@elastic/elasticsearch';
-import type { Session } from './contract.ts';
+import { INDEX_NAME, type Session } from './contract.ts';
 
 export const sessionsMapping: estypes.MappingTypeMapping = {
   properties: {
@@ -25,18 +25,18 @@ export function createElasticClient(): Client {
 
 export async function indexSessions(client: Client, sessions: Session[], recreate = false): Promise<number> {
   if (!sessions.length) throw new Error('No sessions selected; index was not changed');
-  if (await client.indices.exists({index:'sessions'})) {
-    if (!recreate) throw new Error('Index sessions already exists. Pass --recreate to replace it.');
-    console.log('Recreating sessions: deleting the existing index and its documents.');
-    await client.indices.delete({index:'sessions'});
+  if (await client.indices.exists({index:INDEX_NAME})) {
+    if (!recreate) throw new Error(`Index ${INDEX_NAME} already exists. Pass --recreate to replace it.`);
+    console.log(`Recreating ${INDEX_NAME}: deleting the existing index and its documents.`);
+    await client.indices.delete({index:INDEX_NAME});
   }
-  await client.indices.create({index:'sessions',mappings:sessionsMapping});
+  await client.indices.create({index:INDEX_NAME,mappings:sessionsMapping});
   const started = performance.now();
   let serverMs = 0;
   for (let offset = 0; offset < sessions.length; offset += 40) {
     const batch = sessions.slice(offset, offset + 40);
     const result = await client.bulk({
-      operations: batch.flatMap(session => [{index:{_index:'sessions',_id:session.id}}, session]),
+      operations: batch.flatMap(session => [{index:{_index:INDEX_NAME,_id:session.id}}, session]),
       refresh: true,
     });
     serverMs += result.took;
@@ -46,7 +46,7 @@ export async function indexSessions(client: Client, sessions: Session[], recreat
     }
     console.log(`Indexed ${Math.min(offset + batch.length, sessions.length)}/${sessions.length}`);
   }
-  const {count} = await client.count({index:'sessions'});
+  const {count} = await client.count({index:INDEX_NAME});
   if (count !== sessions.length) throw new Error(`Count mismatch: expected ${sessions.length}, found ${count}`);
   console.log(`Confirmed ${count} indexed; bulk/inference wall time ${((performance.now()-started)/1000).toFixed(2)}s; Elastic bulk took ${(serverMs/1000).toFixed(2)}s (includes inference).`);
   return count;

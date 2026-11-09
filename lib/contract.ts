@@ -1,4 +1,5 @@
 export const EVENT_ID = "kccncna2026";
+export const EVENT_UTC_OFFSET = "-07:00";
 export const INDEX_NAME = "sessions";
 export const LOCAL_STATE_KEY = "focustrack:v1";
 export const QUIET_ROOM_260A = "Salt Palace, Level 2, 260A";

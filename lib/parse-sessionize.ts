@@ -1,13 +1,14 @@
-import type { RoomType, Session, SessionKind } from './contract.ts';
+import { EVENT_ID, EVENT_UTC_OFFSET, type RoomType, type Session, type SessionKind } from './contract.ts';
 
 const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const unescape = (value: string) => value.replace(/\\([\\[\]()*_`])/g, '$1');
 
-function timestamp(day: string, clock: string): string {
+function timestamp(day: string, clock: string, offset: string): string {
   const match = /^(\d{1,2}):(\d{2}) ([ap]m)$/i.exec(clock);
   if (!match || +match[1] < 1 || +match[1] > 12 || +match[2] > 59) throw new Error('Invalid session time');
+  if (!/^[+-]\d{2}:\d{2}$/.test(offset)) throw new Error('Invalid event UTC offset');
   const hour = +match[1] % 12 + (match[3].toLowerCase() === 'pm' ? 12 : 0);
-  return `${day}T${String(hour).padStart(2, '0')}:${match[2]}:00-07:00`;
+  return `${day}T${String(hour).padStart(2, '0')}:${match[2]}:00${offset}`;
 }
 
 function classify(title: string, room: string, day: string, durationMinutes: number): SessionKind {
@@ -31,7 +32,7 @@ function section(markdown: string, heading: string): string {
     .find(part => part.startsWith(`${heading}\n`))?.slice(heading.length).trim() ?? '';
 }
 
-export function parseSessionize(markdown: string, details: Record<string, string> = {}): Session[] {
+export function parseSessionize(markdown: string, details: Record<string, string> = {}, offset: string = EVENT_UTC_OFFSET): Session[] {
   const sessions: Session[] = [];
   const lines = markdown.replace(/\r/g, '').split('\n');
   let day = '';
@@ -63,12 +64,12 @@ export function parseSessionize(markdown: string, details: Record<string, string
     }));
     const ballroom = /ballroom/i.test(room) && !/\bfoyer\b/i.test(room);
     const breakout = venue === 'Salt Palace' && level !== null && /^(?:\d{3}\b|Grand Ballroom)/i.test(roomParts[2] ?? '');
-    const startsAt = timestamp(day, start);
-    let endsAt = timestamp(day, end);
+    const startsAt = timestamp(day, start, offset);
+    let endsAt = timestamp(day, end, offset);
     if (endsAt <= startsAt) {
       const nextDay = new Date(`${day}T00:00:00Z`);
       nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-      endsAt = timestamp(nextDay.toISOString().slice(0, 10), end);
+      endsAt = timestamp(nextDay.toISOString().slice(0, 10), end, offset);
     }
     const kind = classify(title, room, day, (Date.parse(endsAt) - Date.parse(startsAt)) / 60_000);
     if (kind === 'logistics') continue;
@@ -78,7 +79,7 @@ export function parseSessionize(markdown: string, details: Record<string, string
       : /^\d+\b/.test(roomName) ? 'breakout' : 'other';
     const combined = roomType === 'breakout' && /^\d+\s*[A-Z]\s*[-–]\s*[A-Z]\b/i.test(roomName);
     sessions.push({
-      id, eventId: 'kccncna2026', title, description: section(detail, 'Description'),
+      id, eventId: EVENT_ID, title, description: section(detail, 'Description'),
       speakers: speakers.length ? speakers : names ? names.split(', ').map(name => ({name: unescape(name), company: ''})) : [],
       startsAt, endsAt, day, room, venue, level, roomType, kind, restrictions,
       crowdEstimate: ballroom ? 'large' : combined ? 'moderate' : 'unknown',

@@ -4,6 +4,7 @@ import { createElasticClient, indexSessions, sessionsMapping } from './elastic.t
 import { parseSessionize } from './parse-sessionize.ts';
 import { readFileSync } from 'node:fs';
 import { Client } from '@elastic/elasticsearch';
+import { INDEX_NAME } from './contract.ts';
 const sessions = () => parseSessionize(readFileSync(join(process.cwd(), 'lib/__fixtures__/schedule.md'), 'utf8'));
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 describe('Elastic ingestion', () => {
@@ -25,12 +26,14 @@ describe('Elastic ingestion', () => {
   it('creates mappings and indexes with Sessionize IDs, then confirms the count', async () => {
     const client = new Client({node:'http://localhost:9200'});
     vi.spyOn(client.indices,'exists').mockResolvedValue(false);
-    const create = vi.spyOn(client.indices,'create').mockResolvedValue({acknowledged:true,shards_acknowledged:true,index:'sessions'});
+    const create = vi.spyOn(client.indices,'create').mockResolvedValue({acknowledged:true,shards_acknowledged:true,index:INDEX_NAME});
     const bulk = vi.spyOn(client,'bulk').mockResolvedValue({errors:false,took:15,items:[]});
-    vi.spyOn(client,'count').mockResolvedValue({count:6,_shards:{total:1,successful:1,failed:0}});
+    const count = vi.spyOn(client,'count').mockResolvedValue({count:6,_shards:{total:1,successful:1,failed:0}});
     expect(await indexSessions(client,sessions())).toBe(6);
-    expect(create).toHaveBeenCalledWith({index:'sessions',mappings:sessionsMapping});
-    expect(bulk.mock.calls[0]?.[0]).toMatchObject({operations:[{index:{_index:'sessions',_id:'1379082'}},...sessions().slice(0,1),...sessions().slice(1).flatMap(s => [{index:{_index:'sessions',_id:s.id}},s])]});
+    expect(client.indices.exists).toHaveBeenCalledWith({index:INDEX_NAME});
+    expect(create).toHaveBeenCalledWith({index:INDEX_NAME,mappings:sessionsMapping});
+    expect(bulk.mock.calls[0]?.[0]).toMatchObject({operations:[{index:{_index:INDEX_NAME,_id:'1379082'}},...sessions().slice(0,1),...sessions().slice(1).flatMap(s => [{index:{_index:INDEX_NAME,_id:s.id}},s])]});
+    expect(count).toHaveBeenCalledWith({index:INDEX_NAME});
   });
   it('refuses an existing index unless recreation is explicit', async () => {
     const client = new Client({node:'http://localhost:9200'});
@@ -50,9 +53,9 @@ it('recreates only when requested and verifies the final document count', async 
   const client = new Client({node:'http://localhost:9200'});
   vi.spyOn(client.indices,'exists').mockResolvedValue(true);
   const remove = vi.spyOn(client.indices,'delete').mockResolvedValue({acknowledged:true});
-  vi.spyOn(client.indices,'create').mockResolvedValue({acknowledged:true,shards_acknowledged:true,index:'sessions'});
+  vi.spyOn(client.indices,'create').mockResolvedValue({acknowledged:true,shards_acknowledged:true,index:INDEX_NAME});
   vi.spyOn(client,'bulk').mockResolvedValue({errors:false,took:15,items:[]});
   vi.spyOn(client,'count').mockResolvedValue({count:5,_shards:{total:1,successful:1,failed:0}});
   await expect(indexSessions(client,sessions(),true)).rejects.toThrow('Count mismatch: expected 6, found 5');
-  expect(remove).toHaveBeenCalledWith({index:'sessions'});
+  expect(remove).toHaveBeenCalledWith({index:INDEX_NAME});
 });
