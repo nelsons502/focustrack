@@ -64,3 +64,9 @@ export function parseDemoNow(raw: string | null): Date | null {
     : `${raw}${EVENT_UTC_OFFSET}`;
   return parseDate(withOffset);
 }
+
+export function formatEventTime(value: string): string {
+  const date = parseDate(value);
+  if (!date) return "time unknown";
+  return `${timeFormatter.format(date)}${zoneName(date)}`;
+}
