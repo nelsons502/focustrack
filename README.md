@@ -18,7 +18,7 @@ A big conference packs hundreds of sessions into a few days. For autistic, anxio
 | Area | Status | What you get |
 | --- | --- | --- |
 | Find | Live on main | Hybrid search (keyword plus semantic) over the real KubeCon NA 2026 schedule. Filter by day and hide restricted sessions (sold out, separate registration, all-access pass). Results show event-time schedule, room, speakers, and type. |
-| Plan | On-device saving and energy-check logic are on main; the agenda interface is in [PR #13](https://github.com/nelsons502/focustrack/pull/13). | Save session IDs locally, review overlaps and load against adjustable thresholds, and choose a real quiet-room break. |
+| Plan | On main ([PR #13](https://github.com/nelsons502/focustrack/pull/13)). | Save session IDs locally, review overlaps and load against adjustable thresholds, and choose a real quiet-room break. |
 | Be present | On main ([PR #7](https://github.com/nelsons502/focustrack/pull/7)) | A calm Now screen with the current and next session, device-local notes, and a reversible not-attending action. |
 | Plain-language summaries | Prepared data on main ([PR #6](https://github.com/nelsons502/focustrack/pull/6)); display integration pending. | Ten reviewed previews, ready to apply to Elastic and display with an explicit AI label after approval. |
 
