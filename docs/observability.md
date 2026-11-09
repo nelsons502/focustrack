@@ -29,6 +29,15 @@ Next.js and `@vercel/otel` automatic request/fetch spans can carry full URLs inc
 - `DASH0_OTLP_ENDPOINT` — HTTPS Dash0 ingress base URL (or a URL already ending in `/v1/traces`, `/v1/metrics`, or `/v1/logs`).
 - `DASH0_AUTH_TOKEN` — Dash0 auth token. Read only in `instrumentation.ts`. Never rename to a `NEXT_PUBLIC_` key, never pass to any component, and never log it. `resolveTelemetryConfig()` deliberately returns only `{ enabled, endpoint }` so the token cannot leak through the config object.
 
+### Kubernetes wiring: separate optional Secret
+
+`deploy/deployment.yaml` maps both keys into the `app` container from a new Secret, `dash0-credentials`, which is separate from `app-credentials` (that one still supplies only `ES_URL` and `ES_API_KEY`):
+
+- `DASH0_OTLP_ENDPOINT` ← Secret `dash0-credentials`, key `dash0-endpoint`, `optional: true`
+- `DASH0_AUTH_TOKEN` ← Secret `dash0-credentials`, key `dash0-token`, `optional: true`
+
+Because both references are optional, pods start normally if the Secret or either key does not exist; the variables are then unset and telemetry stays a no-op. Telemetry turns on only once an operator creates `dash0-credentials` with both keys (values are never committed) and the pods restart. This wiring does not depend on any other environment-reference change, and the Secret has not been confirmed to exist in the cluster.
+
 ## What is and is not captured
 
 Allowed span/log/metric attributes (allowlisted in `lib/telemetry/sanitize.ts`, re-validated at export in `toSafeExportAttributes`):
@@ -78,7 +87,7 @@ Live manager proof (2026-11-09, local Node CLI): one healthy real Elastic lookup
 
 The real `@vercel/otel` registration regression also proves the automatic exporter bypass: removing the explicit empty processor list exports a synthetic URL and exception; retaining it exports only the sanitized custom span.
 
-Still pending: deployed Kubernetes search signals after this PR and C2 environment references land and the existing Secret has both Dash0 keys. Vercel integration is disconnected and remains a cold manual fallback, so Vercel telemetry is not claimed. Browser monitoring, dashboard, SLO and Agent0 investigation remain separate follow-up work.
+Still pending: deployed Kubernetes search signals. Deployed evidence is pending the PR #14 rollout and the creation of the separate optional `dash0-credentials` Secret with keys `dash0-endpoint` and `dash0-token`; nothing about the deployed pods has been verified yet. Vercel integration is disconnected and remains a cold manual fallback, so Vercel telemetry is not claimed. Browser monitoring, dashboard, SLO and Agent0 investigation remain separate follow-up work.
 
 ## Agent0 investigation (13:24 MT)
 
