@@ -55,7 +55,7 @@ Key decisions:
 
 **Gitar (Sonar).** Features land as separate pull requests, and Gitar reviewed and committed fixes (as gitar-bot) on PRs #3, #4, #5, and #8. Project-aware review rules live in [`.gitar/review/conventions.md`](.gitar/review/conventions.md) (strict TypeScript, event time zones, Elastic as the data layer, RRF) and [`.gitar/review/product-principles.md`](.gitar/review/product-principles.md) (focus-first, accessibility, honest data, privacy). Gitar review findings and CI-failure fixes are visible on the [pull requests](https://github.com/nelsons502/focustrack/pulls?q=is%3Apr).
 
-**Radar.** The app runs on Kubernetes in the team namespace, deployed by Argo CD from [`argocd/application.yaml`](argocd/application.yaml) and [`deploy/`](deploy/), with a GitHub Actions image workflow ([`.github/workflows/image.yml`](.github/workflows/image.yml)). Setup, probes, and the release flow are documented in [`docs/radar.md`](docs/radar.md). A Radar AI investigation of the running app (`chat_ie6DbFJiQMGlhJN_`) was an all-clear that recommended a PodDisruptionBudget, which PR #15 added ([`deploy/pdb.yaml`](deploy/pdb.yaml)). Radar Checks went from 4 medium findings (12:56 MT) to 0 (14:04 MT) after that PR.
+**Radar.** The app runs on Kubernetes in the team namespace, deployed by Argo CD from [`argocd/application.yaml`](argocd/application.yaml) and [`deploy/`](deploy/), with a GitHub Actions image workflow ([`.github/workflows/image.yml`](.github/workflows/image.yml)). Setup, probes, and the release flow are documented in [`docs/radar.md`](docs/radar.md). A [Radar AI investigation](https://app.radarhq.io/c/uRdEIEL90Yk/investigations/chat_ie6DbFJiQMGlhJN_?org=org_NCJbssDGEBsU) of the running app was an all-clear that recommended a PodDisruptionBudget, which PR #15 added ([`deploy/pdb.yaml`](deploy/pdb.yaml)). Radar Checks went from 4 medium findings (12:56 MT) to 0 (14:04 MT) after that PR.
 
 **Dash0.** Server-side OpenTelemetry (traces, metrics, logs) around Elastic calls is on main, exported through privacy-filtering exporters that never send queries, plans, or schedule text; see [`docs/observability.md`](docs/observability.md). Telemetry from a local run (trace, metrics, and a correlated log) was verified in Dash0; verifying telemetry from the deployed pods and an SLO dashboard are in progress.
 
@@ -97,7 +97,7 @@ AI coding agents wrote most of the code under that direction:
 - An orchestrator (Claude Code, Claude Opus).
 - A build manager (OpenAI Codex, GPT-6.1-Sol).
 - Workers and cross-model reviewers (Codex, Muse, and Claude Sonnet and Opus).
-- Gitar for pull request review and CI fixes.
+- Gitar for pull request review, automatic code corrections, and CI analysis. Human review caught and corrected an automatic-close regression in the Now screen; a green bot approval alone was not treated as permission to merge.
 
 Every pull request had a reviewer from a different model family than its author.
 
@@ -105,4 +105,4 @@ Runtime AI: Elastic's built-in inference powers semantic search. Plain-language 
 
 ## License
 
-License: TBD
+License: TBD. No project license has been selected yet.
