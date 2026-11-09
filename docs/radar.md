@@ -1,7 +1,8 @@
 # FocusTrack on Radar and Kubernetes
 
 The primary demo URL is `https://focustrack.cnh.radarhq.io`. Vercel is the fallback.
-The manager handles cluster operations; this platform work only prepares files.
+The orchestrator performs Radar MCP and cluster operations; the build manager
+prepares and validates the release files.
 
 ## What each piece does
 
@@ -44,8 +45,9 @@ under `stringData` in the UI and apply. `es-url` is the Elastic base HTTPS URL;
 Deployment's `secretKeyRef` passes these as `ES_URL` and `ES_API_KEY` at runtime.
 A reference does not create the Secret. Missing keys stop the container from
 starting. Never paste the values into chat, git, Docker build arguments, or logs.
-After changing a value, the manager restarts the Deployment through Radar so new
-Pods read the new environment. Argo CD leaves this manually created Secret alone.
+After changing a value, the orchestrator restarts the Deployment through Radar so new
+Pods read the new environment. The orchestrator reported this Secret created at
+11:35 MT. Argo CD leaves this manually created Secret alone.
 
 **Probes.** `/healthz` always returns HTTP 200 with `{"status":"ok"}` when the app
 can handle requests. Kubernetes uses it for liveness: restart a stuck app, without
@@ -71,7 +73,7 @@ The Application is named `app-focustrack` and lives in `team-focustrack`, using
 the preinstalled project `team-focustrack`. It does not live in namespace
 `argocd`. This team-specific Application name deliberately differs from the
 starter's name `app`; use this name when inspecting or syncing it through Radar.
-If an existing Application named `app` already owns these resources, the manager
+If an existing Application named `app` already owns these resources, the orchestrator
 must arrange the ownership handover before enabling this one; do not run two
 Applications reconciling the same Deployment and Service.
 
@@ -107,12 +109,12 @@ Applications reconciling the same Deployment and Service.
    commit before the next authorized push. The bot commit does not loop into
    another build (GITHUB_TOKEN pushes do not trigger another push workflow;
    the path filter and skip marker also protect this flow).
-6. Once the first image is public and the Secret exists, the manager applies
-   `argocd/application.yaml` once through Radar. Later releases need no manual
-   manifest apply. Argo CD notices the bot commit, updates the Deployment's image,
+6. Once the first image is public and the Secret exists, the orchestrator applies
+   `argocd/application.yaml` once through Radar after Nelson approves the release
+   checkpoint. Later releases need no manual manifest apply. Argo CD notices the bot commit, updates the Deployment's image,
    starts replacement Pods, and waits for readiness before sending them traffic.
-   The manager can refresh/sync through Radar instead of waiting for git polling.
-7. The manager confirms that the expected source SHA's action succeeded, the
+   The orchestrator can refresh/sync through Radar instead of waiting for git polling.
+7. The orchestrator confirms that the expected source SHA's action succeeded, the
    remote Kustomize tag matches it, the Application synced the expected bot/git
    revision, and the live Deployment uses that SHA image with ready Pods. Then
    open `https://focustrack.cnh.radarhq.io`, check `/healthz` and `/readyz`, and
@@ -129,17 +131,24 @@ cluster `cnh` or another team's cluster. Keep all owned application changes in
 git; direct cluster edits will be undone by self-heal. No kubectl or Radar
 operations were performed by this worker.
 
-The dependency-free probe test suites run with Node 22's TypeScript stripping:
+The probe tests use the scaffold's Vitest runner:
 
 ```sh
-node --experimental-strip-types --test app/healthz/route.test.mjs app/readyz/route.test.mjs
+npm test -- app/healthz/route.test.ts app/readyz/route.test.ts
 ```
 
-They cover independent liveness, authenticated readiness, unsuccessful Elastic
+Run all release checks with `npm run typecheck`, `npm run lint`, `npm test`, and
+`npm run build`. Build the cluster image locally with
+`docker build --platform linux/amd64 -t focustrack:c-platform-check .`.
+Run it on port 8080 with runtime credentials passed as environment variables;
+`/healthz` must return 200 independently, and `/readyz` must return 200 with live
+Elastic credentials or 503 when they are absent. Never bake credentials into the image.
+
+The tests cover independent liveness, authenticated readiness, unsuccessful Elastic
 responses, missing credentials, network failure, and the actual abort deadline.
-The production Docker build and full scaffold checks still require Worker A's
-files. After those land, validate the standalone build and container startup with
-runtime credentials supplied outside git, then let the manager verify live probes.
+Worker A's scaffold is included in this branch. Local checks and the Docker smoke
+test are recorded below; cluster rollout verification remains a separate
+orchestrator checkpoint.
 
 Adapted from the [official starter](https://github.com/skyhook-io/cnh-starter):
 the GHCR build/tag/bot-commit pattern, Kustomize image replacement, two replicas,
@@ -149,6 +158,36 @@ team-specific Application name, multistage Next.js image, runtime Elastic Secret
 references, meaningful readiness, startup probe, larger memory limit, and explicit
 numeric non-root identity with no mounted Kubernetes API credentials. The bot uses
 standard `sed` instead of the starter's `yq`, avoiding an additional tool assumption.
+
+## Branch policy check
+
+At 11:42 MT on November 9, the GitHub API reported that `main` has no classic
+branch protection (HTTP 404, "Branch not protected"). Effective branch rules and
+repository rulesets both returned empty lists. No branch policy presently blocks
+the image workflow's `GITHUB_TOKEN` push to `deploy/kustomization.yaml`; no settings
+were changed. The repository default token permission is read-only, and this
+workflow explicitly requests `contents: write` and `packages: write`.
+This does not prove a future workflow push succeeded: verify the
+first actual image workflow and bot commit after merge.
+
+## Local release validation
+
+At 11:43 MT, `npm run typecheck`, `npm run lint`, `npm test` (13 tests), and
+`npm run build` all passed. Muse Wonder reviewed the Codex-authored platform diff
+and returned `VERDICT: MEETS` with no findings at 11:47 MT.
+The Linux amd64 build stalled for more than seven minutes in `npm ci` under
+local emulation and was stopped. An independent container request reached the
+npm registry with HTTP 200. A native Linux arm64 build was also limited by a slow base-image download.
+The full Dockerfile build remains unverified locally. The image workflow builds
+on its GitHub-hosted Ubuntu runner after merge.
+
+At 11:53 MT, the locally built standalone bundle passed an actual Linux amd64
+container smoke test using the cached Node 22 Alpine image with the bundle
+mounted read-only. Node ran as uid 1000 on port 8080: home and `/healthz` returned
+200; `/readyz` returned 503 without credentials and 200 with live Elastic
+credentials passed only through the process environment. This verifies the
+standalone runtime and real probe connectivity, not the incomplete image build. No cluster deployment,
+Radar investigation, or Checks screenshot has been performed by the build manager.
 
 ## Radar story — presentation draft
 
@@ -163,7 +202,7 @@ This is an evidence template, not a claim that deployment or investigation happe
 | 16:00 | Checks screenshot after changes, same namespace filter | Not yet captured |
 | Presentation | Explain whom FocusTrack helps and one decision Radar informed | Draft after evidence exists |
 
-The manager should run at least one hosted AI investigation on the running app;
+The orchestrator should run at least one hosted AI investigation on the running app;
 an all-clear after a release counts. Never deliberately break the app. Investigations
 start private; the person who starts it must present it or deliberately share it
 (sharing exposes it to all hackathon teams). Findings need primary evidence before
@@ -177,8 +216,8 @@ changing the app. Use these pages after replacing the placeholders:
 
 ## If the cluster breaks
 
-Switch the presentation to the team's Vercel fallback deployment; the manager
-records its actual URL when available. Configure `ES_URL` and `ES_API_KEY` in
+Switch the presentation to the Vercel fallback at
+`https://focustrack-cnh.vercel.app`. Configure `ES_URL` and `ES_API_KEY` in
 Vercel's environment settings, never in git. Keep the last known good fallback
 available, and use Radar evidence to explain the cluster problem without spending
-the demo debugging. Vercel deployment and its URL are managed outside this worker.
+the demo debugging. Vercel continues to build pull-request previews and serves as the fallback deployment.
