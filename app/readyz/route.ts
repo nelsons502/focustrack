@@ -15,7 +15,7 @@ export async function GET() {
       await response.body?.cancel();
       if (response.ok) return Response.json({ status: "ok" });
     } catch {
-      // Probe failures must not expose credentials or upstream error details.
+      return Response.json({ status: "unavailable" }, { status: 503 });
     }
   }
 
