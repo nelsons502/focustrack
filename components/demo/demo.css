@@ -54,13 +54,8 @@ body:has(.demo-bar) {
 
 .demo-bar-controls {
   display: flex;
-  flex-wrap: nowrap;
-  overflow-x: auto;
+  flex-wrap: wrap;
   gap: 0.375rem;
-}
-
-html:has(.demo-bar) {
-  scroll-padding-bottom: 6.5rem;
 }
 
 .demo-bar-button {
