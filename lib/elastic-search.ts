@@ -1,5 +1,15 @@
 import type { Client, estypes } from "@elastic/elasticsearch";
-import { INDEX_NAME, type SearchResponse, type Session } from "./contract";
+import {
+  INDEX_NAME,
+  type Captions,
+  type CrowdEstimate,
+  type NoiseEstimate,
+  type Restriction,
+  type RoomType,
+  type SearchResponse,
+  type Session,
+  type SessionKind,
+} from "./contract";
 import { createElasticClient } from "./elastic";
 
 let cachedClient: Client | undefined;
@@ -14,6 +24,26 @@ const SESSION_FIELDS = [
   "crowdEstimate", "crowdBasis", "noiseEstimate", "noiseBasis", "captions",
   "plainSummary", "summarySource", "sourceUrl",
 ] as const satisfies readonly (keyof Session)[];
+
+const ROOM_TYPES = ["keynote-hall", "ballroom", "breakout", "expo-floor", "other"] as const satisfies readonly RoomType[];
+const SESSION_KINDS = [
+  "talk", "keynote", "panel", "lightning", "demo", "workshop", "community", "colocated", "logistics",
+] as const satisfies readonly SessionKind[];
+const RESTRICTIONS = ["sold-out", "separate-registration", "all-access-pass"] as const satisfies readonly Restriction[];
+const CROWD_ESTIMATES = ["large", "moderate", "unknown"] as const satisfies readonly CrowdEstimate[];
+const NOISE_ESTIMATES = ["loud", "unknown"] as const satisfies readonly NoiseEstimate[];
+const CAPTIONS = ["wordly-breakout", "unknown"] as const satisfies readonly Captions[];
+type SummarySource = NonNullable<Session["summarySource"]>;
+const SUMMARY_SOURCES = ["ai-reviewed"] as const satisfies readonly SummarySource[];
+
+type Exhaustive<U, L extends readonly unknown[]> = [Exclude<U, L[number]>] extends [never] ? true : never;
+const _roomTypesComplete: Exhaustive<RoomType, typeof ROOM_TYPES> = true;
+const _sessionKindsComplete: Exhaustive<SessionKind, typeof SESSION_KINDS> = true;
+const _restrictionsComplete: Exhaustive<Restriction, typeof RESTRICTIONS> = true;
+const _crowdEstimatesComplete: Exhaustive<CrowdEstimate, typeof CROWD_ESTIMATES> = true;
+const _noiseEstimatesComplete: Exhaustive<NoiseEstimate, typeof NOISE_ESTIMATES> = true;
+const _captionsComplete: Exhaustive<Captions, typeof CAPTIONS> = true;
+const _summarySourcesComplete: Exhaustive<SummarySource, typeof SUMMARY_SOURCES> = true;
 
 export class ApiInputError extends Error {}
 
@@ -64,19 +94,18 @@ function sessionOnly(value: unknown): Session {
     room: sourceString(source.room),
     venue: source.venue === null ? null : sourceString(source.venue),
     level: source.level === null ? null : sourceString(source.level),
-    roomType: sourceEnum(source.roomType, ["keynote-hall", "ballroom", "breakout", "expo-floor", "other"]),
-    kind: sourceEnum(source.kind, ["talk", "keynote", "panel", "lightning", "demo", "workshop", "community", "colocated", "logistics"]),
-    restrictions: sourceArray(source.restrictions).map((value) =>
-      sourceEnum(value, ["sold-out", "separate-registration", "all-access-pass"])),
-    crowdEstimate: sourceEnum(source.crowdEstimate, ["large", "moderate", "unknown"]),
+    roomType: sourceEnum(source.roomType, ROOM_TYPES),
+    kind: sourceEnum(source.kind, SESSION_KINDS),
+    restrictions: sourceArray(source.restrictions).map((value) => sourceEnum(value, RESTRICTIONS)),
+    crowdEstimate: sourceEnum(source.crowdEstimate, CROWD_ESTIMATES),
     crowdBasis: sourceString(source.crowdBasis),
-    noiseEstimate: sourceEnum(source.noiseEstimate, ["loud", "unknown"]),
+    noiseEstimate: sourceEnum(source.noiseEstimate, NOISE_ESTIMATES),
     noiseBasis: sourceString(source.noiseBasis),
-    captions: sourceEnum(source.captions, ["wordly-breakout", "unknown"]),
+    captions: sourceEnum(source.captions, CAPTIONS),
     sourceUrl: sourceString(source.sourceUrl),
   };
   if (source.plainSummary !== undefined) session.plainSummary = sourceString(source.plainSummary);
-  if (source.summarySource !== undefined) session.summarySource = sourceEnum(source.summarySource, ["ai-reviewed"]);
+  if (source.summarySource !== undefined) session.summarySource = sourceEnum(source.summarySource, SUMMARY_SOURCES);
   return session;
 }
 
@@ -107,9 +136,7 @@ export async function searchSessions(params: URLSearchParams): Promise<SearchRes
   const filter: estypes.QueryDslQueryContainer[] = [];
   if (day !== null) filter.push({ term: { day } });
   if (excludeRestricted === "true") {
-    filter.push({ bool: { must_not: [{ terms: { restrictions: [
-      "sold-out", "separate-registration", "all-access-pass",
-    ] } }] } });
+    filter.push({ bool: { must_not: [{ terms: { restrictions: [...RESTRICTIONS] } }] } });
   }
   const lexical: estypes.QueryDslQueryContainer = q
     ? { multi_match: { query: q, fields: ["title^2", "description"] } }
