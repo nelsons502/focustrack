@@ -120,12 +120,11 @@ describe("process-owned export resource identity", () => {
   });
 
   it("gives independent Node processes distinct writer identities, stable across module copies", () => {
-    const moduleUrl = pathToFileURL(`${process.cwd()}/lib/telemetry/exporters.ts`).href;
+    const resourceUrl = pathToFileURL(`${process.cwd()}/lib/telemetry/resource.ts`).href;
     const script = `
-      const a = await import(${JSON.stringify(moduleUrl)});
-      const b = await import(${JSON.stringify(moduleUrl + "?copy")});
-      const resource = { attributes: { "service.instance.id": "private-host" } };
-      console.log(JSON.stringify([a.safeResource(resource).attributes["service.instance.id"], b.safeResource(resource).attributes["service.instance.id"]]));
+      const a = await import(${JSON.stringify(resourceUrl + "?a")});
+      const b = await import(${JSON.stringify(resourceUrl + "?b")});
+      console.log(JSON.stringify([a.processInstanceId(), b.processInstanceId()]));
     `;
     const run = () => JSON.parse(execFileSync(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", script], { encoding: "utf8" })) as string[];
     const first = run();
