@@ -6,6 +6,10 @@ export type ReflectionPrompts = {
 };
 
 const VERSUS_WORDS = new Set(["vs", "vs.", "versus"]);
+const TERM_BOUNDARIES = new Set([
+  "a", "an", "and", "at", "by", "choosing", "comparing", "for", "from",
+  "in", "of", "on", "or", "the", "to", "use", "using", "with",
+]);
 
 function clean(text: string): string {
   return text.replace(/\s+/g, " ").trim();
@@ -31,6 +35,7 @@ function joinTerm(words: string[], index: number, step: 1 | -1): string {
     startsUpper(parts[0]) &&
     words[next] !== undefined &&
     startsUpper(words[next]) &&
+    !TERM_BOUNDARIES.has(stripPunctuation(words[next]).toLowerCase()) &&
     !/[.,;:!?]$/.test(step === 1 ? parts[parts.length - 1] : words[next])
   ) {
     parts.push(words[next]);

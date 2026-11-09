@@ -87,3 +87,13 @@ describe("term spelling", () => {
     });
   });
 });
+
+describe("title-case comparison boundaries", () => {
+  it.each([
+    ["Choosing Helm vs Kustomize For Teams", { first: "Helm", second: "Kustomize" }],
+    ["Should You Use Argo or Flux", { first: "Argo", second: "Flux" }],
+    ["Choosing Service Mesh versus Ambient Mesh For Teams", { first: "Service Mesh", second: "Ambient Mesh" }],
+  ])("extracts names from %s", (title, expected) => {
+    expect(findContrast(title)).toEqual(expected);
+  });
+});
