@@ -5,7 +5,7 @@ import { createElasticClient } from '../lib/elastic.ts';
 import { parseSessionize } from '../lib/parse-sessionize.ts';
 import { checkSummary } from '../lib/summary-guardrail.ts';
 import {
-  AUTO_SUMMARY_PIPELINE, descriptionHash, needsAutoSummary, selectDetailIds, sessionChanged, syncOperations, withStoredDetails,
+  AUTO_SUMMARY_PIPELINE, type StoredVersion, descriptionHash, needsAutoSummary, selectDetailIds, sessionChanged, syncOperations, withStoredDetails,
 } from '../lib/auto-summary.ts';
 import { createMarkdownFetcher, source } from './ingest.ts';
 
@@ -23,19 +23,38 @@ export function parseSyncOptions(args: string[]): SyncOptions {
   return options;
 }
 
-async function storedSessions(client: Client): Promise<Map<string, Record<string, unknown>>> {
-  const result = await client.search<Record<string, unknown>>({ index: INDEX_NAME, size: 5000, track_total_hits: true, query: { match_all: {} } });
+type Stored = { sources: Map<string, Record<string, unknown>>; versions: Map<string, StoredVersion> };
+
+async function storedSessions(client: Client): Promise<Stored> {
+  const result = await client.search<Record<string, unknown>>({
+    index: INDEX_NAME, size: 5000, track_total_hits: true, seq_no_primary_term: true, query: { match_all: {} },
+  });
   const total = typeof result.hits.total === 'number' ? result.hits.total : result.hits.total?.value ?? 0;
   if (total > result.hits.hits.length) throw new Error(`Index has ${total} documents; sync reads at most ${result.hits.hits.length}`);
-  return new Map(result.hits.hits.flatMap(hit => hit._id && hit._source ? [[hit._id, hit._source] as const] : []));
+  const sources = new Map<string, Record<string, unknown>>();
+  const versions = new Map<string, StoredVersion>();
+  for (const hit of result.hits.hits) {
+    if (!hit._id || !hit._source) continue;
+    sources.set(hit._id, hit._source);
+    if (typeof hit._seq_no === 'number' && typeof hit._primary_term === 'number') {
+      versions.set(hit._id, { if_seq_no: hit._seq_no, if_primary_term: hit._primary_term });
+    }
+  }
+  return { sources, versions };
 }
 
-async function upsert(client: Client, sessions: Session[]): Promise<void> {
+async function upsert(client: Client, sessions: Session[], versions: Map<string, StoredVersion>): Promise<{ written: number; conflicts: string[] }> {
+  let written = 0;
+  const conflicts: string[] = [];
   for (let offset = 0; offset < sessions.length; offset += 40) {
-    const result = await client.bulk({ operations: syncOperations(sessions.slice(offset, offset + 40)), refresh: 'wait_for' });
-    const failures = result.items.flatMap(item => Object.values(item)).filter(item => item.status >= 300 || item.error);
-    if (result.errors || failures.length) throw new Error(`Upsert failed: ${failures.map(item => `${item._id} status ${item.status}`).join('; ')}`);
+    const result = await client.bulk({ operations: syncOperations(sessions.slice(offset, offset + 40), versions), refresh: 'wait_for' });
+    const items = result.items.flatMap(item => Object.values(item));
+    for (const item of items) if (item.status === 409) conflicts.push(String(item._id));
+    const failures = items.filter(item => item.status !== 409 && (item.status >= 300 || item.error));
+    if (failures.length) throw new Error(`Upsert failed: ${failures.map(item => `${item._id} status ${item.status}`).join('; ')}`);
+    written += items.filter(item => item.status < 300).length;
   }
+  return { written, conflicts };
 }
 
 export function isMissingPipeline(error: unknown): boolean {
@@ -68,7 +87,7 @@ export async function main(): Promise<void> {
     const fetchMarkdown = createMarkdownFetcher(process.env.SYNC_CACHE_DIR || '.cache', new Set(['schedule.md']));
     const list = await fetchMarkdown('schedule.md', source);
     const listed = parseSessionize(list);
-    const stored = await storedSessions(client);
+    const { sources: stored, versions } = await storedSessions(client);
     const detailIds = selectDetailIds(listed, stored, options.detailBudget, Math.floor(Date.now() / 1_800_000));
     const details: Record<string, string> = {};
     for (const id of detailIds) details[id] = await fetchMarkdown(`sessions/${id}.md`, `${source}/session/${id}`);
@@ -77,10 +96,13 @@ export async function main(): Promise<void> {
     const candidates = sessions.filter(session => needsAutoSummary(stored.get(session.id), session.description)).slice(0, options.summaryLimit);
     console.log(`Fetched ${sessions.length} sessions (${detailIds.size} detail pages checked); ${changed.length} new or changed; ${candidates.length} need an automatic summary.`);
     if (options.dryRun) { console.log('Dry run: nothing was written.'); return; }
-    if (changed.length) await upsert(client, changed);
-    const failures = candidates.length ? await summarize(client, candidates.map(session => session.id)) : 0;
+    const { written, conflicts } = changed.length ? await upsert(client, changed, versions) : { written: 0, conflicts: [] };
+    if (conflicts.length) console.log(`Skipped ${conflicts.length} sessions changed by another writer during sync; the next run retries them: ${conflicts.join(', ')}`);
+    const conflicted = new Set(conflicts);
+    const summarizeIds = candidates.filter(session => !conflicted.has(session.id));
+    const failures = summarizeIds.length ? await summarize(client, summarizeIds.map(session => session.id)) : 0;
     if (failures === 'skipped') {
-      console.log(`Sync done: fetched ${sessions.length}, changed ${changed.length}; summaries skipped because pipeline ${AUTO_SUMMARY_PIPELINE} is not set up (run npm run setup-auto-summary). Nothing was deleted.`);
+      console.log(`Sync done: fetched ${sessions.length}, changed ${written}/${changed.length}; summaries skipped because pipeline ${AUTO_SUMMARY_PIPELINE} is not set up (run npm run setup-auto-summary). Nothing was deleted.`);
       return;
     }
     let summarized = 0;
@@ -96,7 +118,7 @@ export async function main(): Promise<void> {
         if (!verdict.ok) { rejected++; console.log(`Guardrail rejected ${session.id}: ${verdict.reason}`); }
       }
     }
-    console.log(`Sync done: fetched ${sessions.length}, changed ${changed.length}, summarized ${summarized}/${candidates.length}, rejected by guardrail ${rejected}, request failures ${failures}. Nothing was deleted.`);
+    console.log(`Sync done: fetched ${sessions.length}, changed ${written}/${changed.length}, summarized ${summarized}/${candidates.length}, rejected by guardrail ${rejected}, request failures ${failures}. Nothing was deleted.`);
   } finally { await client.close(); }
 }
 

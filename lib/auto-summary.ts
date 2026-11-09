@@ -51,15 +51,23 @@ export function sessionChanged(stored: Record<string, unknown> | undefined, next
   return SYNC_FIELDS.some(field => JSON.stringify(stored[field] ?? null) !== JSON.stringify(next[field] ?? null));
 }
 
-export type SyncBulkOperation =
-  | { update: { _index: typeof INDEX_NAME; _id: string; retry_on_conflict: number } }
-  | { doc: SyncFields; doc_as_upsert: true };
+export type StoredVersion = { if_seq_no: number; if_primary_term: number };
 
-export function syncOperations(sessions: Session[]): SyncBulkOperation[] {
-  return sessions.flatMap((session): SyncBulkOperation[] => [
-    { update: { _index: INDEX_NAME, _id: session.id, retry_on_conflict: 3 } },
-    { doc: syncDoc(session), doc_as_upsert: true },
-  ]);
+export type SyncBulkOperation =
+  | { update: { _index: typeof INDEX_NAME; _id: string } & (StoredVersion | { retry_on_conflict: number }) }
+  | { doc: SyncFields; doc_as_upsert: boolean };
+
+// Existing documents are updated only if unchanged since sync read them, so a
+// concurrent writer is never overwritten with a stale description. Elastic forbids
+// compare-and-write together with upsert, so only new IDs use doc_as_upsert.
+export function syncOperations(sessions: Session[], versions: Map<string, StoredVersion> = new Map()): SyncBulkOperation[] {
+  return sessions.flatMap((session): SyncBulkOperation[] => {
+    const version = versions.get(session.id);
+    return [
+      { update: version ? { _index: INDEX_NAME, _id: session.id, ...version } : { _index: INDEX_NAME, _id: session.id, retry_on_conflict: 3 } },
+      { doc: syncDoc(session), doc_as_upsert: !version },
+    ];
+  });
 }
 
 export function selectDetailIds(listed: Session[], stored: Map<string, Record<string, unknown>>, budget: number, slot: number): Set<string> {

@@ -13,10 +13,15 @@ const SENTENCE_OPENERS = new Set([
 ]);
 
 const URL_PATTERN = /\b(?:https?:\/\/|www\.)[^\s<>"')]+/gi;
-const WORD_PATTERN = /[\p{L}\p{N}]+/gu;
+const WORD_PATTERN = /\p{N}+(?:[.,:]\p{N}+)*%?|[\p{L}\p{N}]+/gu;
+const SENTENCE_BREAK = /(?<=[.!?]["'”’)\]]*)\s+/;
 
 function words(text: string): string[] {
   return text.match(WORD_PATTERN) ?? [];
+}
+
+function urls(text: string): string[] {
+  return (text.match(URL_PATTERN) ?? []).map(url => url.replace(/[.,;:!?]+$/, ''));
 }
 
 export function checkSummary(summary: string, source: SummarySource): GuardrailResult {
@@ -24,22 +29,26 @@ export function checkSummary(summary: string, source: SummarySource): GuardrailR
   if (!text) return { ok: false, reason: 'empty' };
   if (text.length > MAX_SUMMARY_CHARACTERS) return { ok: false, reason: `longer than ${MAX_SUMMARY_CHARACTERS} characters` };
   const sourceText = `${source.title}\n${source.description}`;
-  for (const url of text.match(URL_PATTERN) ?? []) {
-    const trimmed = url.replace(/[.,;:!?]+$/, '');
-    if (!sourceText.includes(trimmed)) return { ok: false, reason: `unsupported URL: ${trimmed}` };
+  const sourceUrls = new Set(urls(sourceText));
+  for (const url of urls(text)) {
+    if (!sourceUrls.has(url)) return { ok: false, reason: `unsupported URL: ${url}` };
   }
   const withoutUrls = text.replace(URL_PATTERN, 'link');
-  const sentences = withoutUrls.split(/(?<=[.!?])\s+/).filter(sentence => sentence.trim());
+  const sentences = withoutUrls.split(SENTENCE_BREAK).filter(sentence => sentence.trim());
   if (sentences.length > MAX_SUMMARY_SENTENCES) return { ok: false, reason: `more than ${MAX_SUMMARY_SENTENCES} sentences` };
-  const known = new Set(words(sourceText).map(word => word.toLowerCase()));
+  const known = new Set(words(sourceText.replace(URL_PATTERN, ' ')));
   for (const sentence of sentences) {
     for (const [index, word] of words(sentence).entries()) {
-      const lower = word.toLowerCase();
       if (/\p{N}/u.test(word)) {
-        if (!known.has(lower)) return { ok: false, reason: `unsupported number: ${word}` };
-      } else if (/\p{Lu}/u.test(word) && !known.has(lower) && !(index === 0 && word === capitalize(lower) && SENTENCE_OPENERS.has(lower))) {
-        return { ok: false, reason: `unsupported name: ${word}` };
+        if (!known.has(word)) return { ok: false, reason: `unsupported number: ${word}` };
+        continue;
       }
+      if (!/\p{Lu}/u.test(word) || known.has(word)) continue;
+      const lower = word.toLowerCase();
+      // A sentence-initial word is capitalized by grammar; accept it only when it is
+      // an ordinary lowercase word from the source or a common opener, never an acronym.
+      const grammatical = index === 0 && word === capitalize(lower) && (SENTENCE_OPENERS.has(lower) || known.has(lower));
+      if (!grammatical) return { ok: false, reason: `unsupported name: ${word}` };
     }
   }
   return { ok: true };

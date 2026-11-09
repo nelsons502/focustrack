@@ -53,6 +53,16 @@ describe('syncOperations', () => {
   });
 });
 
+describe('syncOperations concurrency', () => {
+  it('makes updates to existing documents conditional on the version sync read', () => {
+    const operations = syncOperations([session('7'), session('8')], new Map([['7', { if_seq_no: 12, if_primary_term: 1 }]]));
+    expect(operations[0]).toEqual({ update: { _index: 'sessions', _id: '7', if_seq_no: 12, if_primary_term: 1 } });
+    expect(operations[1]).toMatchObject({ doc_as_upsert: false });
+    expect(operations[2]).toEqual({ update: { _index: 'sessions', _id: '8', retry_on_conflict: 3 } });
+    expect(operations[3]).toMatchObject({ doc_as_upsert: true });
+  });
+});
+
 describe('sessionChanged', () => {
   it('ignores summary fields and detects schedule changes', () => {
     const current = session('1');

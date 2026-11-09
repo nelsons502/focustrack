@@ -53,4 +53,28 @@ describe('summary guardrail', () => {
   it('allows ordinary sentence-opening words that are not names', () => {
     expect(passesGuardrail('Learn how a platform team splits the work across clusters. You will see how sync time drops.', source)).toBe(true);
   });
+
+  it('compares whole numbers, so split digits cannot form an invented decimal', () => {
+    const numbers = { title: 'Clusters', description: 'We run 3 clusters across 14 regions.' };
+    expect(checkSummary('This talk covers 3.14 clusters.', numbers)).toEqual({ ok: false, reason: 'unsupported number: 3.14' });
+    expect(passesGuardrail('This talk covers 3 clusters across 14 regions.', numbers)).toBe(true);
+  });
+
+  it('matches acronyms and names case-sensitively', () => {
+    const plain = { title: 'Clusters', description: 'It covers clusters.' };
+    expect(checkSummary('This talk covers IT clusters.', plain)).toEqual({ ok: false, reason: 'unsupported name: IT' });
+    expect(checkSummary('IT teams learn about clusters.', plain)).toEqual({ ok: false, reason: 'unsupported name: IT' });
+    expect(passesGuardrail('Clusters are covered.', plain)).toBe(true);
+  });
+
+  it('requires an exact source URL, not a prefix of one', () => {
+    const tricky = { title: 'Clusters', description: 'Deck: https://example.com.evil.net/deck' };
+    expect(checkSummary('This talk covers clusters, see https://example.com for more.', tricky).ok).toBe(false);
+  });
+
+  it('counts sentences that end inside quotation marks', () => {
+    const plain = { title: 'Clusters', description: 'This talk covers clusters.' };
+    expect(checkSummary('This talk helps." This talk covers clusters." This talk covers clusters.', plain))
+      .toEqual({ ok: false, reason: 'more than 2 sentences' });
+  });
 });
