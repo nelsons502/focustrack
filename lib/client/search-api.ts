@@ -146,42 +146,43 @@ export async function fetchSearch(
   };
 }
 
-const SESSION_BATCH_SIZE = 50;
+const MAX_IDS_PER_REQUEST = 50;
 
-export async function fetchSessionsByIds(
+async function fetchSessionChunk(
   ids: string[],
   signal: AbortSignal,
 ): Promise<Session[]> {
-  const unique = [...new Set(ids)];
-  const batches: string[][] = [];
-  for (let i = 0; i < unique.length; i += SESSION_BATCH_SIZE) {
-    batches.push(unique.slice(i, i + SESSION_BATCH_SIZE));
-  }
-  const loaded = await Promise.all(batches.map((batch) => fetchSessionBatch(batch, signal)));
-  return loaded.flat();
-}
-
-async function fetchSessionBatch(
-  ids: string[],
-  signal: AbortSignal,
-): Promise<Session[]> {
-  const message = "Your sessions could not be loaded. Please try again shortly.";
+  const unavailable = "Your sessions could not be loaded right now. Please try again.";
   let response: Response;
   try {
-    response = await fetch(`/api/sessions?ids=${ids.map(encodeURIComponent).join(",")}`, {
+    response = await fetch(`/api/sessions?ids=${encodeURIComponent(ids.join(","))}`, {
       signal,
       headers: { Accept: "application/json" },
     });
   } catch (error) {
     if (signal.aborted) throw error;
-    throw new Error(message);
+    throw new Error(unavailable);
   }
   let body: unknown;
   try {
     body = (await response.json()) as unknown;
   } catch {
-    throw new Error(message);
+    throw new Error(unavailable);
   }
-  if (!response.ok || !Array.isArray(body)) throw new Error(message);
+  if (!response.ok || !Array.isArray(body)) throw new Error(unavailable);
   return body.filter(isSession);
+}
+
+export async function fetchSessionsByIds(
+  ids: string[],
+  signal: AbortSignal,
+): Promise<Session[]> {
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += MAX_IDS_PER_REQUEST) {
+    chunks.push(ids.slice(i, i + MAX_IDS_PER_REQUEST));
+  }
+  const batches = await Promise.all(
+    chunks.map((chunk) => fetchSessionChunk(chunk, signal)),
+  );
+  return batches.flat();
 }

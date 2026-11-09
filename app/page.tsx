@@ -14,6 +14,11 @@ export default function HomePage() {
           finish, and stay present in the room.
         </p>
       </header>
+      <p className="now-link-row">
+        <a className="now-link" href="/now">
+          Open the Now screen: what is on, and what is next
+        </a>
+      </p>
       <FindSearch />
       <ReflectLink />
       <footer className="credit">
