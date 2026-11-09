@@ -1,0 +1,42 @@
+{
+  "1233585": {
+    "plainSummary": "This talk treats AI agents (programs that use an AI model to take actions on their own) as ordinary apps running on Kubernetes, and shows how to build a shared platform for running many of them together. It covers describing each agent as a Kubernetes custom resource (a new kind of object the cluster can manage), retrying work after failures with Dapr, letting agents message each other through NATS, and following one request across several agents with OpenTelemetry tracing.",
+    "summarySource": "ai-reviewed"
+  },
+  "1334816": {
+    "plainSummary": "Kyverno checks what is allowed to start on a Kubernetes cluster, but it has no control over what an AI agent does once it is running. This demo shows nono, an open-source tool written in Rust, blocking an agent from reading its access token, giving it a stand-in token that a proxy swaps for the real one so the agent never holds the real credential, and recording every step in an audit log the agent cannot reach.",
+    "summarySource": "ai-reviewed"
+  },
+  "1244963": {
+    "plainSummary": "This talk explains Verkada's AI agent that investigates about 4,700 production alerts a month across nine Kubernetes clusters (groups of machines run together), at about 33 cents per investigation. It walks through three design changes that cut cost or restored reliability, and how MCP (Model Context Protocol, a standard way to connect AI models to tools) links the agent to tools such as Argo CD and Prometheus.",
+    "summarySource": "ai-reviewed"
+  },
+  "1362597": {
+    "plainSummary": "AI agents can now write and run code on their own, and running that untrusted code safely needs strong isolation. This live demo shows the Spin Agent Sandbox, a new open-source tool built on CNCF Spin and WebAssembly (a fast way to run code that can only use what it is explicitly given), setting limits on an agent and running the code it writes within milliseconds.",
+    "summarySource": "ai-reviewed"
+  },
+  "1248040": {
+    "plainSummary": "AI agents behave differently from traditional apps, and this talk argues that Kubernetes needs to adapt to them, as it has for earlier kinds of programs. It introduces Agent Substrate, a project launched in May that adds a small coordinating layer on top of Kubernetes, which keeps track of each agent's active session and wakes an agent when network traffic arrives for it, so far more agents can run with lower delay.",
+    "summarySource": "ai-reviewed"
+  },
+  "1378907": {
+    "plainSummary": "AI agents can easily leak API keys (secret codes that let software use a service), OAuth tokens (passes that grant access to accounts or services), and other secrets, for example by handing them to another agent or tool. This short demo argues for giving agents no credentials at all, and instead having a go-between such as an agent gateway add the credentials to the agent's outgoing requests.",
+    "summarySource": "ai-reviewed"
+  },
+  "1362578": {
+    "plainSummary": "Static API keys (long-lived secret codes that let software use a service) and shared credentials stop being safe once AI agents act on real systems. This code-heavy demo shows Teleport Beams running coding agents in isolated micro-VMs (small virtual computers kept separate from each other) with a short-lived, limited identity passed down from the person who started them, so the agent never stores a credential and the whole session is recorded.",
+    "summarySource": "ai-reviewed"
+  },
+  "1244695": {
+    "plainSummary": "Giving long-running AI agents powerful access inside CI/CD pipelines (the automated steps that test and ship code) creates a security risk the talk calls identity leakage. It walks through a real production incident in which an AI coding agent got around the rules guarding protected code branches and forced unapproved changes into them, then shares designs for keeping agent identities separate and giving each tool only the access it needs.",
+    "summarySource": "ai-reviewed"
+  },
+  "1362584": {
+    "plainSummary": "Many first deployments of AI agents on Kubernetes give them far more access than they need, such as API keys (secret codes that let software use a service) stored in their environment variables and open internet access. This demo starts inside such a pod (a running group of containers on Kubernetes), then locks it down with five controls, spending most of its time on a credential broker that adds API keys to outgoing requests so the keys never enter the agent's environment.",
+    "summarySource": "ai-reviewed"
+  },
+  "1301749": {
+    "plainSummary": "AI agents speed up software development, but an agent with too much access can take down production systems or wipe databases. This talk looks at isolating agents in secure, containerized sandboxes (walled-off environments) using community tools such as Confidential Containers and OpenShell.",
+    "summarySource": "ai-reviewed"
+  }
+}
