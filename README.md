@@ -17,10 +17,10 @@ A big conference packs hundreds of sessions into a few days. For autistic, anxio
 
 | Area | Status | What you get |
 | --- | --- | --- |
-| Find (`/`) | Live | Hybrid search (keyword plus semantic) over the real KubeCon NA 2026 schedule. Filter by day and hide restricted sessions (sold out, separate registration, all-access pass). Results show event-time schedule, room, speakers, type, and a plain-language summary where one exists. |
+| Find (`/`) | Live | Hybrid search (keyword plus semantic) over the real KubeCon NA 2026 schedule. Filter by day and hide restricted sessions (sold out, separate registration, all-access pass). Results show event-time schedule, room, speakers, and type. |
 | Plan (`/plan`) | Live | Saved sessions as a timeline for the day you choose. An energy check, run on your device, flags too many sessions in a row, tight transitions (room, level, and building changes), long days, and loud rooms, with thresholds you can adjust. It can suggest dropping a session or saving a quiet-room break (Salt Palace, Level 2, 260A) in a real gap. |
 | Be present (`/now`) | Live | A calm Now screen: the session you are in, what is next, and a transition note, with on-device notes and "not attending". |
-| Plain-language summaries | Live for the demo sessions | AI-written ahead of time, checked, and labelled in `data/summaries.json`. Summarising more sessions autonomously is in progress. |
+| Plain-language summaries | Data on main; in-app display pending | Reviewed AI-written summaries for the demo sessions are in `data/summaries.json`, but the app does not display them yet. Broader autonomous summarising is in progress. |
 | Calendar export | In progress ([PR #11](https://github.com/nelsons502/focustrack/pull/11)) | Export a plan to a calendar. |
 | Remember | In progress, optional ([PR #12](https://github.com/nelsons502/focustrack/pull/12)) | Optional on-device reflection. |
 
@@ -47,7 +47,7 @@ Key decisions:
 - **Personal data stays on the device.** Plan, notes, breaks, and settings live in `localStorage` (`focustrack:v1`). Only saved session IDs are sent, to look up times and rooms.
 - **Estimates never claim "quiet".** Crowd is derived from room type and noise from the exhibit hall; a wrong reassurance harms noise-sensitive attendees, so everything else is "unknown". The rules are in `lib/contract.ts`.
 - **GitOps on Radar and Argo CD.** A push to `main` that changes code builds an image, updates `deploy/kustomization.yaml`, and Argo CD syncs the cluster. See [`docs/radar.md`](docs/radar.md).
-- **AI only ahead of time, apart from search.** Elastic's built-in inference embeds descriptions at ingest and the query at search time; no generative model runs in the app, and summaries are generated beforehand and reviewed.
+- **AI only ahead of time, apart from search.** Elastic's built-in inference embeds descriptions at ingest and the query at search time; no generative model runs in the app, and summaries are generated beforehand and reviewed (display pending).
 
 ## Sponsor tools and how we used them
 
@@ -86,7 +86,7 @@ Deploying: Kubernetes through Argo CD (see [`docs/radar.md`](docs/radar.md)), or
 
 ## Data and credit
 
-Schedule data: CNCF / Sessionize ([source](https://sessionize.com/api/v2/uo948i5p/view/markdown)). The repository holds no schedule data beyond short test-fixture excerpts; ingest fetches the schedule at runtime. Plain-language summaries in `data/summaries.json` are AI-written, checked, and labelled as such in the app (`npm run apply-summaries` writes them to the index).
+Schedule data: CNCF / Sessionize ([source](https://sessionize.com/api/v2/uo948i5p/view/markdown)). The repository holds no schedule data beyond short test-fixture excerpts; ingest fetches the schedule at runtime. Plain-language summaries in `data/summaries.json` are AI-written and reviewed; `npm run apply-summaries` writes them to the index. Showing them in the app, with an AI label, is pending.
 
 ## AI disclosure
 
