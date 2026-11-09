@@ -14,6 +14,7 @@ export default function HomePage() {
         </p>
       </header>
       <FindSearch />
+      <a className="button" href="/reflect">Reflect on today&rsquo;s talks (optional)</a>
       <footer className="credit">
         <a href={SCHEDULE_SOURCE_URL}>Schedule data: CNCF / Sessionize</a>
       </footer>

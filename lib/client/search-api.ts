@@ -59,7 +59,7 @@ function isSpeaker(value: unknown): boolean {
   );
 }
 
-function isSession(value: unknown): value is Session {
+export function isSession(value: unknown): value is Session {
   return (
     isRecord(value) &&
     typeof value.id === "string" &&
@@ -144,4 +144,31 @@ export async function fetchSearch(
     mode: body.mode,
     tookMs: typeof body.tookMs === "number" ? body.tookMs : 0,
   };
+}
+
+export async function fetchSessionsByIds(
+  ids: string[],
+  signal: AbortSignal,
+): Promise<Session[]> {
+  const unique = [...new Set(ids)].slice(0, 50);
+  if (unique.length === 0) return [];
+  const message = "Your sessions could not be loaded. Please try again shortly.";
+  let response: Response;
+  try {
+    response = await fetch(`/api/sessions?ids=${unique.map(encodeURIComponent).join(",")}`, {
+      signal,
+      headers: { Accept: "application/json" },
+    });
+  } catch (error) {
+    if (signal.aborted) throw error;
+    throw new Error(message);
+  }
+  let body: unknown;
+  try {
+    body = (await response.json()) as unknown;
+  } catch {
+    throw new Error(message);
+  }
+  if (!response.ok || !Array.isArray(body)) throw new Error(message);
+  return body.filter(isSession);
 }
