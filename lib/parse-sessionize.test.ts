@@ -15,6 +15,7 @@ describe('Sessionize real Markdown excerpts', () => {
       speakers: [{ name: 'Vara Bonthu', company: 'AWS, Principal Technologist, OSS - Data, AI and Kubernetes' }],
       startsAt: '2026-11-10T11:30:00-07:00', endsAt: '2026-11-10T12:00:00-07:00', day: '2026-11-10',
       room: 'Salt Palace | Level 1 | 151', venue: 'Salt Palace', level: 'Level 1',
+      roomType: 'breakout', noiseEstimate: 'unknown', noiseBasis: 'unknown',
       kind: 'talk', restrictions: [], crowdEstimate: 'unknown', crowdBasis: 'unknown', captions: 'wordly-breakout',
       sourceUrl: 'https://sessionize.com/api/v2/uo948i5p/view/markdown/session/1227395',
     });
@@ -35,7 +36,7 @@ describe('Sessionize real Markdown excerpts', () => {
   });
   it('handles midnight, noon, missing room metadata and absent descriptions', () => {
     const markdown = '### Tuesday, November 10, 2026\n- [Lunch and Learn: Registration APIs](https://sessionize.com/api/v2/uo948i5p/view/markdown/session/1)\n  12:00 am - 12:00 pm · Online';
-    expect(parseSessionize(markdown)[0]).toMatchObject({startsAt:'2026-11-10T00:00:00-07:00',endsAt:'2026-11-10T12:00:00-07:00',venue:null,level:null,description:'',kind:'talk'});
+    expect(parseSessionize(markdown)[0]).toMatchObject({startsAt:'2026-11-10T00:00:00-07:00',endsAt:'2026-11-10T12:00:00-07:00',venue:null,level:null,description:'',kind:'workshop'});
   });
   it('fails clearly on malformed session metadata rather than silently losing sessions', () => {
     expect(() => parseSessionize('### Tuesday, November 10, 2026\n- [Talk](https://sessionize.com/api/v2/uo948i5p/view/markdown/session/1)\n  TBD')).toThrow(/session 1/i);
@@ -66,3 +67,60 @@ it.each(['Coat + Bag Check', '☕ Coffee Break', 'Registration + Badge Pick-Up',
     expect(parseSessionize(`### Tuesday, November 10, 2026\n- [${title}](https://sessionize.com/api/v2/uo948i5p/view/markdown/session/1)\n  8:00 am - 5:00 pm · Salt Palace | Level 2 | East Registration`)).toEqual([]);
   },
 );
+
+function entry(title: string, room = 'Salt Palace | Level 2 | 250 A-C', end = '10:30 am', start = '10:00 am') {
+  return `### Tuesday, November 10, 2026\n- [${title}](https://sessionize.com/api/v2/uo948i5p/view/markdown/session/1)\n  ${start} - ${end} · ${room}`;
+}
+
+it.each([
+  ['Talk', '10:10 am', 'lightning'],
+  ['Talk', '10:11 am', 'talk'],
+  ['Demo Theater: Panel', '10:05 am', 'demo'],
+  ['Demo Theater: Project Showcase', '10:05 am', 'demo'],
+  ['ContribFest: Project Showcase', '10:30 am', 'workshop'],
+  ['Talk', '11:15 am', 'workshop'],
+  ['Talk', '11:14 am', 'talk'],
+  ['Tutorial: Systems', '10:30 am', 'workshop'],
+  ['ContribFest: Systems', '10:30 am', 'workshop'],
+  ['Panel: Systems', '10:30 am', 'panel'],
+  ['Community Gathering: Panel', '11:30 am', 'community'],
+  ['Keynote: Panel', '10:05 am', 'keynote'],
+  ['Tutorial [SOLD OUT] [Separate Registration] [All Access Pass]', '11:30 am', 'colocated'],
+])('classifies %s ending at %s as %s', (title, end, kind) => {
+  expect(parseSessionize(entry(title, undefined, end))[0].kind).toBe(kind);
+});
+
+it('preserves all three title restrictions', () => {
+  expect(parseSessionize(entry('Tutorial [SOLD OUT] [Separate Registration] [All Access Pass]'))[0].restrictions)
+    .toEqual(['sold-out', 'separate-registration', 'all-access-pass']);
+});
+
+it.each([
+  ['Hall DE', 'keynote-hall', 'large', 'keynote room', 'unknown', 'unknown'],
+  ['Grand Ballroom', 'ballroom', 'large', 'ballroom', 'unknown', 'unknown'],
+  ['North Grand Ballroom Foyer', 'other', 'unknown', 'unknown', 'unknown', 'unknown'],
+  ['250 A-C', 'breakout', 'moderate', 'combined numbered breakout room', 'unknown', 'unknown'],
+  ['250 A', 'breakout', 'unknown', 'unknown', 'unknown', 'unknown'],
+  ['151', 'breakout', 'unknown', 'unknown', 'unknown', 'unknown'],
+  ['Solutions Showcase', 'expo-floor', 'unknown', 'unknown', 'loud', 'expo-floor room proxy'],
+  ['Exhibit Hall', 'expo-floor', 'unknown', 'unknown', 'loud', 'expo-floor room proxy'],
+  ['Online', 'other', 'unknown', 'unknown', 'unknown', 'unknown'],
+])('uses transparent room proxies for %s', (room, roomType, crowdEstimate, crowdBasis, noiseEstimate, noiseBasis) => {
+  expect(parseSessionize(entry('Talk', `Salt Palace | Level 2 | ${room}`))[0]).toMatchObject({
+    roomType, crowdEstimate, crowdBasis, noiseEstimate, noiseBasis,
+  });
+});
+
+it('uses the keynote venue proxy even for a non-keynote title', () => {
+  expect(parseSessionize(entry('Community Gathering', 'Salt Palace | Level 1 | Hall DE'))[0])
+    .toMatchObject({roomType: 'keynote-hall', crowdEstimate: 'large'});
+});
+
+it('measures lightning duration across midnight', () => {
+  expect(parseSessionize(entry('Talk', 'Online', '12:05 am', '11:55 pm'))[0].kind).toBe('lightning');
+});
+
+it('recognizes a venue used by keynotes across the schedule', () => {
+  const markdown = `${entry('Talk', 'Convention Center | Main Hall')}\n${entry('Keynote: Welcome', 'Convention Center | Main Hall').replace('/session/1)', '/session/2)')}`;
+  expect(parseSessionize(markdown).map(session => session.roomType)).toEqual(['keynote-hall', 'keynote-hall']);
+});

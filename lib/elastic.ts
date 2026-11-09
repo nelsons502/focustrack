@@ -10,9 +10,9 @@ export const sessionsMapping: estypes.MappingTypeMapping = {
     description_semantic: {type:'semantic_text'},
     speakers: {type:'object',properties:{name:{type:'keyword'},company:{type:'keyword'}}},
     startsAt: {type:'date'}, endsAt: {type:'date'}, day: {type:'keyword'},
-    room: {type:'keyword'}, venue: {type:'keyword'}, level: {type:'keyword'},
+    room: {type:'keyword'}, roomType: {type:'keyword'}, venue: {type:'keyword'}, level: {type:'keyword'},
     kind: {type:'keyword'}, restrictions: {type:'keyword'}, crowdEstimate: {type:'keyword'},
-    crowdBasis: {type:'keyword'}, captions: {type:'keyword'},
+    crowdBasis: {type:'keyword'}, noiseEstimate: {type:'keyword'}, noiseBasis: {type:'keyword'}, captions: {type:'keyword'},
     plainSummary: {type:'text'}, summarySource: {type:'keyword'}, sourceUrl: {type:'keyword'},
   },
 };

@@ -18,6 +18,7 @@ describe('Elastic ingestion', () => {
       title: {type:'text',fields:{keyword:{type:'keyword'}}},
       description:{type:'text',copy_to:'description_semantic'}, description_semantic:{type:'semantic_text'},
       startsAt:{type:'date'}, endsAt:{type:'date'}, speakers:{properties:{name:{type:'keyword'},company:{type:'keyword'}}},
+      roomType:{type:'keyword'}, noiseEstimate:{type:'keyword'}, noiseBasis:{type:'keyword'},
       restrictions:{type:'keyword'}, venue:{type:'keyword'}, level:{type:'keyword'},
     }});
   });
