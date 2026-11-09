@@ -1,6 +1,7 @@
 import { QUIET_ROOM_260A, type Session } from "../contract";
 
 export type PlanBreak = {
+  id?: string;
   startsAt: string;
   endsAt: string;
   room?: string;
@@ -122,7 +123,7 @@ export function buildIcs(sessions: Session[], options: IcsOptions): string {
   for (const quietBreak of options.breaks ?? []) {
     const event = buildEvent(
       {
-        uid: `break-${toUtcStamp(quietBreak.startsAt) ?? "unknown"}@focustrack`,
+        uid: `${quietBreak.id ?? `break-${toUtcStamp(quietBreak.startsAt) ?? "unknown"}`}@focustrack`,
         startsAt: quietBreak.startsAt,
         endsAt: quietBreak.endsAt,
         summary: "Quiet break",

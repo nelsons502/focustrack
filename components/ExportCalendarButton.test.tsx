@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Session } from "../lib/contract";
+import { QUIET_ROOM_260A, type Session } from "../lib/contract";
 import {
   createDefaultLocalState,
   updateLocalState,
@@ -122,6 +122,57 @@ describe("ExportCalendarButton", () => {
     );
     expect(click).toHaveBeenCalled();
     expect(createObjectURL).toHaveBeenCalled();
+    click.mockRestore();
+  });
+
+  it("includes planned quiet breaks in the calendar file", async () => {
+    updateLocalState({
+      ...createDefaultLocalState(),
+      plan: {
+        sessionIds: ["s1"],
+        notAttending: [],
+        breaks: [
+          {
+            id: "break-1",
+            startsAt: "2026-11-10T10:00:00-07:00",
+            endsAt: "2026-11-10T10:20:00-07:00",
+            room: QUIET_ROOM_260A,
+          },
+        ],
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve([makeSession()]),
+        } as Response),
+      ),
+    );
+    const blobs: Blob[] = [];
+    const createObjectURL = vi.fn((blob: Blob) => {
+      blobs.push(blob);
+      return "blob:test";
+    });
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
+
+    render(<ExportCalendarButton />);
+    const button = await screen.findByRole("button", {
+      name: /add my plan to my calendar/i,
+    });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    await waitFor(() => expect(blobs).toHaveLength(1));
+    const ics = await blobs[0].text();
+    expect(ics).toContain("SUMMARY:Kubernetes Basics");
+    expect(ics).toContain("SUMMARY:Quiet break");
+    expect(ics).toContain("UID:break-1@focustrack");
+    expect(ics).toContain("DTSTART:20261110T170000Z");
     click.mockRestore();
   });
 

@@ -7,7 +7,7 @@ import {
   getLocalStateSnapshot,
   subscribeLocalState,
 } from "../lib/client/local-state";
-import { fetchSessionsByIds } from "../lib/client/search-api";
+import { fetchSessionsByIds } from "../lib/client/sessions-api";
 
 type ExportStatus = "idle" | "working" | "ready" | "error";
 
@@ -60,6 +60,7 @@ export default function ExportCalendarButton() {
       downloadFile(
         buildIcs(ordered, {
           notAttending: localState.plan.notAttending,
+          breaks: localState.plan.breaks,
           now: new Date(),
         }),
       );
