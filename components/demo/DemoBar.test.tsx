@@ -33,10 +33,12 @@ describe("DemoBar", () => {
     expect(getSimClock()?.playing).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "Resume demo time" }));
     expect(getSimClock()?.playing).toBe(true);
+    expect(screen.getByRole("button", { name: "Pause demo time" })).toBeInTheDocument();
   });
 
-  it("changes speed and marks the active speed", () => {
+  it("changes speed and marks the active speed while paused", () => {
     startSim("2026-11-10T11:10:00-07:00", 60);
+    pauseSim();
     render(<DemoBar />);
     const fast = screen.getByRole("button", { name: "Set demo speed to 300 times" });
     fireEvent.click(fast);

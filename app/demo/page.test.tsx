@@ -6,8 +6,12 @@ import {
   loadLocalState,
   updateLocalState,
 } from "../../lib/client/local-state";
-import { SCHEDULE_CREDIT, SCHEDULE_SOURCE_URL } from "../../lib/contract";
-import { MAYA_SESSION_IDS, NOW_OPT_OUT_KEY } from "../../lib/demo/maya";
+import {
+  NOW_OPT_OUT_KEY,
+  SCHEDULE_CREDIT,
+  SCHEDULE_SOURCE_URL,
+} from "../../lib/contract";
+import { MAYA_SESSION_IDS } from "../../lib/demo/maya";
 import DemoPage from "./page";
 
 const push = vi.fn();
