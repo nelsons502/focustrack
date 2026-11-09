@@ -25,6 +25,15 @@ export function parseSyncOptions(args: string[]): SyncOptions {
 
 type Stored = { sources: Map<string, Record<string, unknown>>; versions: Map<string, StoredVersion> };
 
+export function selectSyncWork(
+  listed: Session[], stored: Map<string, Record<string, unknown>>, detailBudget: number, slot: number,
+): { listedNow: Session[]; detailIds: Set<string> } {
+  const unseen = listed.filter(session => !stored.has(session.id)).slice(0, detailBudget);
+  const listedNow = listed.filter(session => stored.has(session.id) || unseen.includes(session));
+  const detailIds = selectDetailIds(listedNow, stored, detailBudget, slot);
+  return { listedNow, detailIds };
+}
+
 async function storedSessions(client: Client): Promise<Stored> {
   const result = await client.search<Record<string, unknown>>({
     index: INDEX_NAME, size: 5000, track_total_hits: true, seq_no_primary_term: true, query: { match_all: {} },
@@ -88,10 +97,12 @@ export async function main(): Promise<void> {
     const list = await fetchMarkdown('schedule.md', source);
     const listed = parseSessionize(list);
     const { sources: stored, versions } = await storedSessions(client);
-    const detailIds = selectDetailIds(listed, stored, options.detailBudget, Math.floor(Date.now() / 1_800_000));
+    const { listedNow, detailIds } = selectSyncWork(listed, stored, options.detailBudget, Math.floor(Date.now() / 1_800_000));
     const details: Record<string, string> = {};
     for (const id of detailIds) details[id] = await fetchMarkdown(`sessions/${id}.md`, `${source}/session/${id}`);
-    const sessions = parseSessionize(list, details).map(session => detailIds.has(session.id) ? session : withStoredDetails(session, stored.get(session.id)));
+    const listedNowIds = new Set(listedNow.map(session => session.id));
+    const sessions = parseSessionize(list, details).filter(session => listedNowIds.has(session.id))
+      .map(session => detailIds.has(session.id) ? session : withStoredDetails(session, stored.get(session.id)));
     const changed = sessions.filter(session => sessionChanged(stored.get(session.id), session));
     const candidates = sessions.filter(session => needsAutoSummary(stored.get(session.id), session.description)).slice(0, options.summaryLimit);
     console.log(`Fetched ${sessions.length} sessions (${detailIds.size} detail pages checked); ${changed.length} new or changed; ${candidates.length} need an automatic summary.`);
