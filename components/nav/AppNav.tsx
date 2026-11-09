@@ -13,11 +13,19 @@ export default function AppNav() {
   const menuRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const restoreMenuFocus = useRef(false);
 
   const close = useCallback(() => {
+    restoreMenuFocus.current = true;
     setOpen(false);
-    menuRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (!open && restoreMenuFocus.current) {
+      restoreMenuFocus.current = false;
+      menuRef.current?.focus();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
