@@ -168,10 +168,18 @@ export type Reflection = {
   at: string;
 };
 
+export type PlanBreak = {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  room: typeof QUIET_ROOM_260A;
+};
+
 export type LocalState = {
   plan: {
     sessionIds: string[];
     notAttending: string[];
+    breaks?: PlanBreak[];
   };
   notes: Record<string, NoteEntry[]>;
   energy: EnergySettings;
