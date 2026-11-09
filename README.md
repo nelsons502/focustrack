@@ -24,7 +24,7 @@ A big conference packs hundreds of sessions into a few days. For autistic, anxio
 | Calendar export | In progress ([PR #11](https://github.com/nelsons502/focustrack/pull/11)) | Export a plan to a calendar. |
 | Remember | In progress, optional ([PR #12](https://github.com/nelsons502/focustrack/pull/12)) | Optional on-device reflection. |
 
-Plans, notes, and settings are saved on your device. The Plan and Now pages send only the saved session IDs to the schedule service, and only after you choose to load them, to look up times and rooms. Notes, breaks, and settings are never sent.
+Plans, notes, and settings are saved on your device. The Plan and Now pages send only your saved session IDs to the schedule service to look up times and rooms. Notes, breaks, and settings are never sent.
 
 Honest accessibility data runs through all of it. Crowd and noise appear only as labelled estimates with their basis, or as "unknown", and never as "small" or "quiet". Caption and quiet-room information comes from the official accessibility page. If semantic search is unavailable, the API falls back to keyword search and the UI says so.
 
@@ -44,9 +44,9 @@ Key decisions:
 
 - **Elastic is the only schedule store.** The `sessions` index holds the schedule's sessions (routine logistics such as registration and meals are dropped at ingest). Search, filters, and agenda lookups are Elasticsearch queries, not in-memory filtering.
 - **RRF instead of score blending.** Keyword (BM25) and `semantic_text` scores are on different scales. Reciprocal rank fusion merges the two ranked lists without tuning weights, and filters are applied inside both sub-queries.
-- **Personal data stays on the device.** Plan, notes, breaks, and settings live in `localStorage` (`focustrack:v1`). Only saved session IDs are sent, after you choose to look them up.
+- **Personal data stays on the device.** Plan, notes, breaks, and settings live in `localStorage` (`focustrack:v1`). Only saved session IDs are sent, to look up times and rooms.
 - **Estimates never claim "quiet".** Crowd is derived from room type and noise from the exhibit hall; a wrong reassurance harms noise-sensitive attendees, so everything else is "unknown". The rules are in `lib/contract.ts`.
-- **GitOps on Radar and Argo CD.** A push to `main` builds an image, updates `deploy/kustomization.yaml`, and Argo CD syncs the cluster. See [`docs/radar.md`](docs/radar.md).
+- **GitOps on Radar and Argo CD.** A push to `main` that changes code builds an image, updates `deploy/kustomization.yaml`, and Argo CD syncs the cluster. See [`docs/radar.md`](docs/radar.md).
 - **AI only ahead of time, apart from search.** Elastic's built-in inference embeds descriptions at ingest and the query at search time; no generative model runs in the app, and summaries are generated beforehand and reviewed.
 
 ## Sponsor tools and how we used them
@@ -57,7 +57,7 @@ Key decisions:
 
 **Radar.** The app runs on Kubernetes in the team namespace, deployed by Argo CD from [`argocd/application.yaml`](argocd/application.yaml) and [`deploy/`](deploy/), with a GitHub Actions image workflow ([`.github/workflows/image.yml`](.github/workflows/image.yml)). Setup, probes, and the release flow are documented in [`docs/radar.md`](docs/radar.md). A Radar AI investigation of the running app (`chat_ie6DbFJiQMGlhJN_`) was an all-clear that recommended a PodDisruptionBudget, which PR #15 added ([`deploy/pdb.yaml`](deploy/pdb.yaml)). Radar Checks went from 4 medium findings (12:56 MT) to 0 (14:04 MT) after that PR.
 
-**Dash0.** Server-side OpenTelemetry (traces, metrics, logs) around Elastic calls is on main, exported through privacy-filtering exporters that never send queries, plans, or schedule text; see [`docs/observability.md`](docs/observability.md). Verifying live telemetry in Dash0 and an SLO dashboard are in progress.
+**Dash0.** Server-side OpenTelemetry (traces, metrics, logs) around Elastic calls is on main, exported through privacy-filtering exporters that never send queries, plans, or schedule text; see [`docs/observability.md`](docs/observability.md). Telemetry from a local run (trace, metrics, and a correlated log) was verified in Dash0; verifying telemetry from the deployed pods and an SLO dashboard are in progress.
 
 ## Accessibility
 
