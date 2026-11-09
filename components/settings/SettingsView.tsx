@@ -127,7 +127,12 @@ export default function SettingsView() {
   }
 
   function handleClear() {
-    updateLocalState(createDefaultLocalState());
+    const previous = getLocalStateSnapshot();
+    if (!updateLocalState(createDefaultLocalState())) {
+      updateLocalState(previous);
+      setStatus("Could not clear saved data. Your saved data may still be on this device. Please try again.");
+      return;
+    }
     stopSim();
     clearThemeChoice();
     setNumericDrafts({});
@@ -208,7 +213,7 @@ export default function SettingsView() {
 
       <section aria-labelledby="settings-demo-heading" className="settings-card">
         <h2 id="settings-demo-heading">Demo</h2>
-        <p>See a conference day unfold at 60× speed, without touching a real plan of your own making.</p>
+        <p>See a conference day unfold at 60× speed. Starting the demo replaces your saved plan; notes and reflections stay on this device.</p>
         <Link href={withNowParam("/demo", rawNow)} className="button settings-demo-link">
           Play my day
         </Link>
