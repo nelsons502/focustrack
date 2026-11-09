@@ -44,6 +44,7 @@ import {
 import { fetchSessionsByIds } from "../lib/client/sessions-api";
 import { formatEventTime } from "../lib/client/time";
 import PrimaryNav from "./plan/PrimaryNav";
+import { LARGE_SCREEN_QUERY, useLargeScreen } from "./now/useLargeScreen";
 
 const NOTE_DEBOUNCE_MS = 500;
 
@@ -76,7 +77,8 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   const [loadingIds, setLoadingIds] = useState(false);
   const requested = useRef(new Set<string>());
   const [announcement, setAnnouncement] = useState("");
-  const [notesOpen, setNotesOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const isLarge = useLargeScreen();
   const [notesSession, setNotesSession] = useState<Session | null>(null);
   const [draft, setDraft] = useState({ text: "", sessionId: "" });
   const draftRef = useRef(draft);
@@ -84,7 +86,10 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   const [retryToken, setRetryToken] = useState(0);
   const [reflectTick, setReflectTick] = useState(0);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const restoreNotesFocus = useRef(false);
   const noteInputRef = useRef<HTMLTextAreaElement>(null);
+  const doneRef = useRef<HTMLButtonElement>(null);
   const skipButtonRef = useRef<HTMLButtonElement>(null);
   const undoSkipRef = useRef<HTMLButtonElement>(null);
   const focusAfterSkip = useRef<"undo" | "skip" | null>(null);
@@ -158,7 +163,19 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   });
 
   const findHref = withNowParam("/", nowParam);
-  const noteTarget = notesOpen && notesSession ? notesSession : current;
+  const sheetVisible = sheetOpen && !isLarge;
+  const panelDefault = current ?? previous;
+  const lockedSession =
+    draft.sessionId &&
+    draft.sessionId !== panelDefault?.id &&
+    notesToDraft(localState.notes[draft.sessionId]) !== (draft.text.trim() ? draft.text : "")
+      ? known[draft.sessionId]
+      : undefined;
+  const noteTarget: Session | null = isLarge
+    ? (lockedSession ?? panelDefault)
+    : sheetVisible && notesSession
+      ? notesSession
+      : current;
 
   function flushDraft(): void {
     const pending = draftRef.current;
@@ -173,13 +190,27 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   const flushDraftRef = useRef(flushDraft);
 
   useEffect(() => {
-    if (!notesOpen || !draft.sessionId) return undefined;
+    if (!draft.sessionId) return undefined;
     if (notesToDraft(getLocalStateSnapshot().notes[draft.sessionId]) === draft.text) {
       return undefined;
     }
     const timer = window.setTimeout(() => flushDraftRef.current(), NOTE_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [notesOpen, draft]);
+  }, [draft]);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return undefined;
+    const query = window.matchMedia(LARGE_SCREEN_QUERY);
+    const onChange = () => {
+      if (query.matches) {
+        flushDraftRef.current();
+        restoreNotesFocus.current = true;
+        setSheetOpen(false);
+      }
+    };
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     const onPageHide = () => flushDraftRef.current();
@@ -198,24 +229,82 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
     draftRef.current = nextDraft;
     setDraft(nextDraft);
     setNotesSession(current);
-    setNotesOpen(true);
+    setSheetOpen(true);
   }
 
   function closeNotes() {
     flushDraft();
-    setNotesOpen(false);
-    toggleRef.current?.focus();
+    restoreNotesFocus.current = true;
+    setSheetOpen(false);
   }
 
   useEffect(() => {
-    if (notesOpen) noteInputRef.current?.focus();
-  }, [notesOpen]);
+    if (sheetVisible) {
+      noteInputRef.current?.focus();
+    } else if (restoreNotesFocus.current) {
+      restoreNotesFocus.current = false;
+      (toggleRef.current ?? mainRef.current)?.focus();
+    }
+  }, [sheetVisible]);
+
+  useEffect(() => {
+    if (!sheetVisible) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [sheetVisible]);
 
   function handleNotesKey(event: KeyboardEvent<HTMLElement>) {
     if (event.key === "Escape") {
       event.stopPropagation();
       closeNotes();
+      return;
     }
+    if (event.key !== "Tab") return;
+    const first = doneRef.current;
+    const last = noteInputRef.current;
+    if (!first || !last) return;
+    const active = document.activeElement;
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    } else if (active !== first && active !== last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  function renderNotepad(target: Session) {
+    const stored = notesToDraft(localState.notes[target.id]);
+    return (
+      <div className="now-note-form">
+        <label htmlFor="now-note-input">
+          Notes. Write freely. Saves on this device as you type.
+        </label>
+        <textarea
+          ref={noteInputRef}
+          id="now-note-input"
+          className="now-notepad"
+          value={draft.sessionId === target.id ? draft.text : stored}
+          rows={isLarge ? 14 : 6}
+          autoComplete="off"
+          enterKeyHint="done"
+          onChange={(event) => {
+            if (draftRef.current.sessionId && draftRef.current.sessionId !== target.id) {
+              flushDraft();
+            }
+            const nextDraft = { text: event.target.value, sessionId: target.id };
+            draftRef.current = nextDraft;
+            setDraft(nextDraft);
+          }}
+        />
+      </div>
+    );
   }
 
   function handleNotAttending() {
@@ -223,7 +312,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
     const title = current.title;
     flushDraft();
     setSkipped(current);
-    setNotesOpen(false);
+    setSheetOpen(false);
     updateLocalState(markNotAttending(getLocalStateSnapshot(), current.id));
     focusAfterSkip.current = "undo";
     setAnnouncement(`Okay, skipping ${title}. Taking a break is fine. Showing what is next.`);
@@ -250,7 +339,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
 
   return (
     <div className="now-page">
-      <main id="main" tabIndex={-1} className="now-shell">
+      <main ref={mainRef} id="main" tabIndex={-1} className="now-shell">
         <header className="now-head">
           <p className="app-name">FocusTrack</p>
           <PrimaryNav current="now" nowParam={nowParam} />
@@ -275,6 +364,8 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
           {announcement}
         </div>
 
+        <div className="now-layout">
+        <div className="now-main-col">
         {!mounted ? <p className="now-muted">Loading your plan…</p> : null}
 
         {mounted && loadError ? (
@@ -450,48 +541,73 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
           </section>
         ) : null}
 
-        {ready && !loadError && noteTarget ? (
+        </div>
+
+        {ready && !loadError && isLarge ? (
+          <aside className="now-notes-panel" aria-labelledby="now-notes-heading">
+            {noteTarget ? (
+              <>
+                <h2 id="now-notes-heading" className="now-notes-title">
+                  {noteTarget.title}
+                </h2>
+                {current ? null : (
+                  <p className="now-muted">This session has ended. Your notes are still here.</p>
+                )}
+                {renderNotepad(noteTarget)}
+              </>
+            ) : (
+              <>
+                <h2 id="now-notes-heading" className="now-notes-title">
+                  Notes
+                </h2>
+                <p className="now-muted">
+                  Notes for a session appear here once it is running. Nothing to write yet.
+                </p>
+              </>
+            )}
+          </aside>
+        ) : null}
+        </div>
+
+        {ready && !loadError && !isLarge && (current || sheetVisible) ? (
           <section className="now-notes" aria-label="Quick notes">
             <button
               ref={toggleRef}
               type="button"
               className="now-button now-toggle"
-              aria-expanded={notesOpen}
-              aria-controls="now-notes-drawer"
-              onClick={() => (notesOpen ? closeNotes() : openNotes())}
+              aria-expanded={sheetVisible}
+              aria-controls="now-notes-sheet"
+              onClick={openNotes}
             >
-              {notesOpen ? "Close notes" : "Quick notes"}
+              Notes
             </button>
-            {notesOpen ? (
-              <div
-                id="now-notes-drawer"
-                className="now-drawer"
-                role="group"
-                aria-label={`Notes for ${noteTarget.title}`}
-                onKeyDown={handleNotesKey}
-              >
-                <div className="now-note-form">
-                  <label htmlFor="now-note-input">
-                    Notes. Write freely. Saves on this device as you type.
-                  </label>
-                  <textarea
-                    ref={noteInputRef}
-                    id="now-note-input"
-                    className="now-notepad"
-                    value={draft.sessionId === noteTarget.id ? draft.text : ""}
-                    rows={6}
-                    autoComplete="off"
-                    enterKeyHint="done"
-                    onChange={(event) => {
-                      const nextDraft = { text: event.target.value, sessionId: noteTarget.id };
-                      draftRef.current = nextDraft;
-                      setDraft(nextDraft);
-                    }}
-                  />
-                </div>
-              </div>
-            ) : null}
           </section>
+        ) : null}
+
+        {sheetVisible && noteTarget ? (
+          <div
+            id="now-notes-sheet"
+            className="now-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="now-sheet-title"
+            onKeyDown={handleNotesKey}
+          >
+            <div className="now-sheet-head">
+              <h2 id="now-sheet-title" className="now-notes-title">
+                {noteTarget.title}
+              </h2>
+              <button
+                ref={doneRef}
+                type="button"
+                className="now-button now-button-primary now-done"
+                onClick={closeNotes}
+              >
+                Done
+              </button>
+            </div>
+            {renderNotepad(noteTarget)}
+          </div>
         ) : null}
 
         <section className="now-quiet" aria-label="Quiet rooms">
