@@ -168,7 +168,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   const lockedSession =
     draft.sessionId &&
     draft.sessionId !== panelDefault?.id &&
-    notesToDraft(localState.notes[draft.sessionId]) !== draft.text
+    notesToDraft(localState.notes[draft.sessionId]) !== (draft.text.trim() ? draft.text : "")
       ? known[draft.sessionId]
       : undefined;
   const noteTarget: Session | null = isLarge
@@ -197,6 +197,14 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
     const timer = window.setTimeout(() => flushDraftRef.current(), NOTE_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [draft]);
+
+  useEffect(() => {
+    if (isLarge && sheetOpen) {
+      flushDraftRef.current();
+      setSheetOpen(false);
+      noteInputRef.current?.focus();
+    }
+  }, [isLarge, sheetOpen]);
 
   useEffect(() => {
     const onPageHide = () => flushDraftRef.current();

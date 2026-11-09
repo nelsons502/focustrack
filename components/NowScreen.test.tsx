@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Session } from "../lib/contract";
 import { LOCAL_STATE_KEY } from "../lib/contract";
@@ -421,4 +421,35 @@ it.each(["Done", "Escape"])("returns focus to the main content after a talk ends
   else fireEvent.keyDown(screen.getByLabelText(/Write freely/), { key: "Escape" });
   expect(getLocalStateSnapshot().notes.cur.map((note) => note.text)).toEqual(["final thought"]);
   await waitFor(() => expect(document.getElementById("main")).toHaveFocus());
+});
+
+it("moves the desktop notepad to the next talk after a whitespace-only draft", async () => {
+  vi.stubGlobal("matchMedia", vi.fn((query: string) => ({ matches: true, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
+  seedPlan(["cur", "nxt"]);
+  mockSessions([current, next]);
+  const view = render(<NowScreen nowParam="2026-11-10T11:25-07:00" />);
+  fireEvent.change(await screen.findByLabelText(/Write freely/), { target: { value: " \n " } });
+  fireEvent(window, new Event("pagehide"));
+  view.rerender(<NowScreen nowParam="2026-11-10T11:50-07:00" />);
+  expect(await screen.findByRole("complementary", { name: "Session nxt" })).toBeInTheDocument();
+});
+
+it("does not reopen the notes sheet after resizing to desktop and back", async () => {
+  let wide = false;
+  const listeners = new Set<() => void>();
+  vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
+    get matches() { return wide; }, media: query,
+    addEventListener: (_type: string, listener: () => void) => listeners.add(listener),
+    removeEventListener: (_type: string, listener: () => void) => listeners.delete(listener),
+  })));
+  seedPlan(["cur"]);
+  mockSessions([current]);
+  render(<NowScreen nowParam={DEMO} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Notes" }));
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+  act(() => { wide = true; listeners.forEach((listener) => listener()); });
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  act(() => { wide = false; listeners.forEach((listener) => listener()); });
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(document.body.style.overflow).toBe("");
 });
