@@ -113,7 +113,8 @@ export async function main(): Promise<void> {
     }
     if (detailsDeferred) console.log(`Deferred ${detailsDeferred} detail pages to the next run (cap ${limits.maxDetailFetches}, deadline ${limits.deadlineSeconds}s).`);
     const listedNowIds = new Set(listedNow.map(session => session.id));
-    const sessions = parseSessionize(list, details).filter(session => listedNowIds.has(session.id))
+    const sessions = parseSessionize(list, details)
+      .filter(session => listedNowIds.has(session.id) && (stored.has(session.id) || fetchedIds.has(session.id)))
       .map(session => fetchedIds.has(session.id) ? session : withStoredDetails(session, stored.get(session.id)));
     const changed = sessions.filter(session => sessionChanged(stored.get(session.id), session));
     const needing = sessions.filter(session => needsAutoSummary(stored.get(session.id), session.description));
