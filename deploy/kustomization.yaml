@@ -3,6 +3,7 @@ kind: Kustomization
 namespace: team-focustrack
 resources:
   - deployment.yaml
+  - pdb.yaml
   - service.yaml
   - httproute.yaml
 # The image workflow owns this tag after the initial build.
