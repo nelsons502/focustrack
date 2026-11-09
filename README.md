@@ -17,12 +17,23 @@ A big conference packs hundreds of sessions into a few days. For autistic, anxio
 
 | Area | Status | What you get |
 | --- | --- | --- |
-| Find | Live on main | Hybrid search (keyword plus semantic) over the real KubeCon NA 2026 schedule. Filter by day and hide restricted sessions (sold out, separate registration, all-access pass). Results show event-time schedule, room, speakers, and type. |
-| Plan | On main ([PR #13](https://github.com/nelsons502/focustrack/pull/13)). | Save session IDs locally, review overlaps and load against adjustable thresholds, and choose a real quiet-room break. |
-| Be present | On main ([PR #7](https://github.com/nelsons502/focustrack/pull/7)) | A calm Now screen with the current and next session, device-local notes, and a reversible not-attending action. |
-| Plain-language summaries | Prepared data on main ([PR #6](https://github.com/nelsons502/focustrack/pull/6)); display integration pending. | Ten reviewed previews, applied to Elastic; visible app previews and an explicit AI label still need integration. |
+| Find (`/`) | Live | Hybrid search (keyword plus semantic) over the real KubeCon NA 2026 schedule. Filter by day and hide restricted sessions (sold out, separate registration, all-access pass). Results show event-time schedule, room, speakers, and type. |
+| Plan (`/plan`) | Live | Saved sessions as a timeline for the day you choose. An energy check, run on your device, flags too many sessions in a row, tight transitions (room, level, and building changes), long days, and loud rooms, with thresholds you can adjust. It can suggest dropping a session or saving a quiet-room break (Salt Palace, Level 2, 260A) in a real gap. |
+| Be present (`/now`) | Live | A calm Now screen: the session you are in, what is next, and a transition note, with on-device notes and "not attending". |
+| Plain-language summaries | Data on main; in-app display pending | Reviewed AI-written summaries for the demo sessions are in `data/summaries.json`, but the app does not display them yet. Broader autonomous summarising is in progress. |
+| Calendar export | On main ([PR #11](https://github.com/nelsons502/focustrack/pull/11)) | Download your sessions and quiet breaks as a calendar file; FocusTrack adds no alarms. |
+| Remember (`/reflect`) | On main ([PR #12](https://github.com/nelsons502/focustrack/pull/12)) | Optional, ungraded reflection on completed planned talks, with device-local answers and a night-of recap. |
+
+Plans, notes, and settings are saved on your device. Plan, Now, calendar export and reflection use saved public session IDs to look up schedule details. Notes, breaks, settings and reflection answers are never sent.
 
 Honest accessibility data runs through all of it. Crowd and noise appear only as labelled estimates with their basis, or as "unknown", and never as "small" or "quiet". Caption and quiet-room information comes from the official accessibility page. If semantic search is unavailable, the API falls back to keyword search and the UI says so.
+
+## Demo flow
+
+1. Open the demo link above and search for a topic; save two or more sessions.
+2. Open Plan, choose the event day, and review any overlap or energy warnings. A quiet-room break is offered when a real gap fits.
+3. Open Now with the demo clock preserved, capture a note, then close the app. Export the plan from Find to let your own calendar handle reminders.
+4. After a planned talk has ended, open Remember for an optional reflection and recap. With the real clock before the conference, an empty state is expected.
 
 ## Architecture
 
@@ -33,26 +44,27 @@ flowchart LR
   G[GitHub main] -->|Argo CD| N
   N -->|BM25 + semantic_text, fused by RRF| E
   B -.->|plan and notes stay on device| L[(localStorage)]
+  N -.->|OpenTelemetry| D[Dash0]
 ```
 
 Key decisions:
 
 - **Elastic is the only schedule store.** The `sessions` index holds the schedule's sessions (routine logistics such as registration and meals are dropped at ingest). Search, filters, and agenda lookups are Elasticsearch queries, not in-memory filtering.
 - **RRF instead of score blending.** Keyword (BM25) and `semantic_text` scores are on different scales. Reciprocal rank fusion merges the two ranked lists without tuning weights, and filters are applied inside both sub-queries.
-- **Personal data stays on the device.** Plan and settings live in `localStorage` (`focustrack:v1`). Selected public session IDs are sent to the schedule lookup API to retrieve times and rooms; notes, settings and reflection answers are not sent.
+- **Personal data stays on the device.** Plan, notes, breaks, and settings live in `localStorage` (`focustrack:v1`). Selected public session IDs are sent to the schedule lookup API to retrieve times and rooms; notes, settings, breaks and reflection answers are not sent.
 - **Estimates never claim "quiet".** Crowd is derived from room type and noise from the exhibit hall; a wrong reassurance harms noise-sensitive attendees, so everything else is "unknown". The rules are in `lib/contract.ts`.
-- **GitOps on Radar and Argo CD.** A push to `main` builds an image, updates `deploy/kustomization.yaml`, and Argo CD syncs the cluster. See [`docs/radar.md`](docs/radar.md).
-- **AI only ahead of time, apart from search.** Elastic's built-in inference embeds descriptions at ingest and the query at search time; no generative model runs in the app, and summaries are generated beforehand and reviewed.
+- **GitOps on Radar and Argo CD.** A push to `main` that changes code builds an image, updates `deploy/kustomization.yaml`, and Argo CD syncs the cluster. See [`docs/radar.md`](docs/radar.md).
+- **AI only ahead of time, apart from search.** Elastic's built-in inference embeds descriptions at ingest and the query at search time; no generative model runs in the app, and summaries are generated beforehand and reviewed (display pending).
 
 ## Sponsor tools and how we used them
 
-**Elastic.** Elastic Serverless is the core data layer: a `sessions` index with an explicit mapping, a `semantic_text` field using built-in inference, and an RRF retriever that fuses a BM25 `multi_match` with a semantic query. See [`lib/elastic.ts`](lib/elastic.ts) and [`lib/elastic-search.ts`](lib/elastic-search.ts). The `/readyz` probe also checks that Elastic is reachable.
+**Elastic.** Elastic Serverless (9.7.0) is the core data layer: a `sessions` index with an explicit mapping, a `semantic_text` field using built-in inference, and an RRF retriever that fuses a BM25 `multi_match` with a semantic query. See [`lib/elastic.ts`](lib/elastic.ts) and [`lib/elastic-search.ts`](lib/elastic-search.ts). The `/readyz` probe also checks that Elastic is reachable.
 
-**Gitar (Sonar).** Features land as separate pull requests. Project-aware review rules live in [`.gitar/review/conventions.md`](.gitar/review/conventions.md) (strict TypeScript, event time zones, Elastic as the data layer, RRF) and [`.gitar/review/product-principles.md`](.gitar/review/product-principles.md) (focus-first, accessibility, honest data, privacy). Gitar findings, automatic code corrections, and CI outcomes are visible on the [pull requests](https://github.com/nelsons502/focustrack/pulls?q=is%3Apr).
+**Gitar (Sonar).** Features land as separate pull requests, and Gitar reviewed and committed fixes (as gitar-bot) on PRs #3, #4, #5, and #8. Project-aware review rules live in [`.gitar/review/conventions.md`](.gitar/review/conventions.md) (strict TypeScript, event time zones, Elastic as the data layer, RRF) and [`.gitar/review/product-principles.md`](.gitar/review/product-principles.md) (focus-first, accessibility, honest data, privacy). Gitar review findings, automatic code corrections and CI outcomes are visible on the [pull requests](https://github.com/nelsons502/focustrack/pulls?q=is%3Apr).
 
-**Radar.** The app runs on Kubernetes in the team namespace, deployed by Argo CD from [`argocd/application.yaml`](argocd/application.yaml) and [`deploy/`](deploy/), with a GitHub Actions image workflow ([`.github/workflows/image.yml`](.github/workflows/image.yml)). Setup, probes, and the release flow are documented in [`docs/radar.md`](docs/radar.md). A [completed Radar investigation](https://app.radarhq.io/c/uRdEIEL90Yk/investigations/chat_ie6DbFJiQMGlhJN_?org=org_NCJbssDGEBsU) found the deployment healthy at that point in time and identified the missing disruption budget implemented in merged [PR #15](https://github.com/nelsons502/focustrack/pull/15). Read-only verification on November 9 found two ready replicas and zero Radar Checks findings, down from four medium findings before the hardening and orphan cleanup. Before/after screenshot capture remains pending.
+**Radar.** The app runs on Kubernetes in the team namespace, deployed by Argo CD from [`argocd/application.yaml`](argocd/application.yaml) and [`deploy/`](deploy/), with a GitHub Actions image workflow ([`.github/workflows/image.yml`](.github/workflows/image.yml)). Setup, probes, and the release flow are documented in [`docs/radar.md`](docs/radar.md). A [Radar AI investigation](https://app.radarhq.io/c/uRdEIEL90Yk/investigations/chat_ie6DbFJiQMGlhJN_?org=org_NCJbssDGEBsU) of the running app was an all-clear that recommended a PodDisruptionBudget, which PR #15 added ([`deploy/pdb.yaml`](deploy/pdb.yaml)). Radar Checks went from 4 medium findings (12:56 MT) to 0 (13:58–14:04 MT) after hardening and separate orphan cleanup. Read-only verification found two ready replicas; before/after screenshot capture remains pending.
 
-**Dash0.** Server traces, correlated logs and metrics around Elastic calls are on main ([PR #14](https://github.com/nelsons502/focustrack/pull/14)). CLI telemetry is verified. A deployed hybrid search on November 9 at 21:04 UTC produced an `elastic.search` span, a completion log with the same mode and result count, and an operations metric update in Dash0. Browser monitoring and a dashboard/SLO remain pending.
+**Dash0.** Server-side OpenTelemetry (traces, metrics, logs) around Elastic calls is on main, exported through privacy-filtering exporters that never send queries, plans, or schedule text; see [`docs/observability.md`](docs/observability.md). Telemetry from a local run (trace, metrics, and a correlated log) was verified in Dash0. A deployed hybrid search on November 9 at 21:04 UTC also produced an `elastic.search` span, a completion log with matching mode and result count, and an operations metric update in Dash0. Browser monitoring and a dashboard/SLO remain pending.
 
 ## Accessibility
 
@@ -81,7 +93,7 @@ Deploying: Kubernetes through Argo CD (see [`docs/radar.md`](docs/radar.md)), or
 
 ## Data and credit
 
-Schedule data: CNCF / Sessionize ([source](https://sessionize.com/api/v2/uo948i5p/view/markdown)). The repository holds no schedule data beyond short test-fixture excerpts; ingest fetches the schedule at runtime. Plain-language summaries ([PR #6](https://github.com/nelsons502/focustrack/pull/6)) are AI-written and reviewed. Their app display and explicit AI label are a pending integration; the data PR alone does not provide a visible preview.
+Schedule data: CNCF / Sessionize ([source](https://sessionize.com/api/v2/uo948i5p/view/markdown)). The repository holds no schedule data beyond short test-fixture excerpts; ingest fetches the schedule at runtime. Plain-language summaries in `data/summaries.json` are AI-written and reviewed; the ten reviewed summaries have been applied to the live index with `npm run apply-summaries`. Showing them in the app, with an AI label, is pending.
 
 ## AI disclosure
 
@@ -92,7 +104,7 @@ AI coding agents wrote most of the code under that direction:
 - An orchestrator (Claude Code, Claude Opus).
 - A build manager (OpenAI Codex, GPT-6.1-Sol).
 - Workers and cross-model reviewers (Codex, Muse, and Claude Sonnet and Opus).
-- Gitar for pull request review, automatic code corrections and CI analysis. Human review caught and corrected an automatic-close regression in the Now screen; green bot approval alone was not treated as permission to merge.
+- Gitar for pull request review, automatic code corrections, and CI analysis. Human review caught and corrected an automatic-close regression in the Now screen; a green bot approval alone was not treated as permission to merge.
 
 Every pull request had a reviewer from a different model family than its author.
 
