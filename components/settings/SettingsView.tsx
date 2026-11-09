@@ -223,7 +223,8 @@ export default function SettingsView() {
         <h2 id="settings-privacy-heading">Your data on this device</h2>
         <p>
           Your plan, notes, breaks, reflections and energy settings stay on this device.
-          They are not sent to a server. To show times and rooms for saved talks, public
+          They are not sent to a server. This page uses system fonts and does not request
+          fonts from a third party. To show times and rooms for saved talks, public
           session IDs are sent to the schedule lookup; nothing you wrote is included.
         </p>
         {confirmingClear ? (

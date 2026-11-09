@@ -86,6 +86,7 @@ describe("SettingsView clear data", () => {
     expect(screen.getByRole("link", { name: /Play my day/ })).toHaveAttribute("href", `/demo?now=${encodeURIComponent(now)}`);
     expect(screen.getByText(/Your plan, notes, breaks, reflections and energy settings stay on this device/)).toBeInTheDocument();
     expect(screen.getByText(/public session IDs/)).toBeInTheDocument();
+    expect(screen.getByText(/does not request fonts from a third party/)).toBeInTheDocument();
   });
 });
 

@@ -137,19 +137,21 @@ describe("SessionCard interactions", () => {
     ).toBeInTheDocument();
   });
 
-  it("reflects plan state with aria-pressed", () => {
+  it("keeps the toggle label stable while reflecting plan state with aria-pressed", () => {
     const { rerender } = renderCard(makeSession(), false);
-    expect(screen.getByRole("button", { name: /Add to plan/ })).toHaveAttribute(
+    const buttonName = "Add to plan: Kubernetes Basics Test Session";
+    expect(screen.getByRole("button", { name: buttonName })).toHaveAttribute(
       "aria-pressed",
       "false",
     );
     rerender(
       <SessionCard session={makeSession()} inPlan onTogglePlan={vi.fn()} />,
     );
-    expect(screen.getByRole("button", { name: /In your plan/ })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: buttonName })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
+    expect(screen.getByText("In your plan", { selector: ".plan-state" })).toBeInTheDocument();
   });
 });
 
