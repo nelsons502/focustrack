@@ -11,13 +11,43 @@ export type Speaker = {
 export type SessionKind =
   | "talk"
   | "keynote"
+  | "panel"
+  | "lightning"
+  | "demo"
+  | "workshop"
   | "community"
   | "colocated"
   | "logistics";
 
-export type Restriction = "sold-out" | "separate-registration";
+export type RoomType =
+  | "keynote-hall"
+  | "ballroom"
+  | "breakout"
+  | "expo-floor"
+  | "other";
 
-export type CrowdEstimate = "large" | "unknown";
+export type Restriction =
+  | "sold-out"
+  | "separate-registration"
+  | "all-access-pass";
+
+export type CrowdEstimate = "large" | "moderate" | "unknown";
+
+export type NoiseEstimate = "loud" | "unknown";
+
+export const PARSE_RULES = {
+  lightning: "Duration is 10 minutes or less.",
+  demo: 'Title starts with "Demo Theater:".',
+  workshop: "Duration is 75 minutes or more, or title mentions Tutorial or ContribFest.",
+  panel: 'Title contains "Panel".',
+  expoFloor: 'Room contains "Solutions Showcase" or "Exhibit Hall".',
+  keynoteHall: "Room used by keynote sessions.",
+  ballroom: 'Room contains "Ballroom".',
+  breakout: "Numbered room.",
+  crowd: 'Large for keynote-hall or ballroom; moderate for a combined breakout like "250 A-C"; otherwise unknown.',
+  noise: "Loud for expo-floor; otherwise unknown.",
+  sensorySafety: 'Never add "small" or "quiet" estimates: false reassurance harms noise-sensitive attendees.',
+} as const;
 
 export type Captions = "wordly-breakout" | "unknown";
 
@@ -33,10 +63,13 @@ export type Session = {
   room: string;
   venue: string | null;
   level: string | null;
+  roomType: RoomType;
   kind: SessionKind;
   restrictions: Restriction[];
   crowdEstimate: CrowdEstimate;
   crowdBasis: string;
+  noiseEstimate: NoiseEstimate;
+  noiseBasis: string;
   captions: Captions;
   plainSummary?: string;
   summarySource?: "ai-reviewed";
@@ -58,7 +91,9 @@ export type EnergySettings = {
   minBreakMinutes: number;
   transitionMinutes: number;
   levelChangeMinutes: number;
+  buildingChangeMinutes: number;
   maxDailyHours: number;
+  flagLoudRooms: boolean;
 };
 
 export const DEFAULT_ENERGY_SETTINGS: EnergySettings = {
@@ -66,7 +101,9 @@ export const DEFAULT_ENERGY_SETTINGS: EnergySettings = {
   minBreakMinutes: 20,
   transitionMinutes: 10,
   levelChangeMinutes: 15,
+  buildingChangeMinutes: 20,
   maxDailyHours: 5,
+  flagLoudRooms: true,
 };
 
 export type Warning =
@@ -79,7 +116,8 @@ export type Warning =
       neededMinutes: number;
     }
   | { type: "long-day"; hours: number; maxHours: number }
-  | { type: "overlap"; sessionIds: [string, string] };
+  | { type: "overlap"; sessionIds: [string, string] }
+  | { type: "loud-room"; sessionId: string };
 
 export type EnergySuggestion = {
   kind: "drop" | "break";
