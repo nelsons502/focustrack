@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AppNav from "./AppNav";
 
@@ -26,6 +26,28 @@ describe("AppNav", () => {
     const panelId = menu.getAttribute("aria-controls") ?? "";
     expect(document.getElementById(panelId)).toContainElement(screen.getByRole("button", { name: "Close" }));
     expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
+  });
+
+  it("keeps focus on the visible navigation when widening while open", () => {
+    let onChange: ((event: MediaQueryListEvent) => void) | undefined;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: (_: string, callback: (event: MediaQueryListEvent) => void) => {
+        onChange = callback;
+      },
+      removeEventListener: vi.fn(),
+    }));
+    render(<AppNav />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    document.body.tabIndex = -1;
+    document.body.focus();
+    expect(document.body).toHaveFocus();
+
+    act(() => onChange?.({ matches: true } as MediaQueryListEvent));
+
+    document.body.removeAttribute("tabindex");
+    expect(screen.getByRole("link", { name: "Find" })).toHaveFocus();
   });
 
   it("makes page content inert while open", () => {

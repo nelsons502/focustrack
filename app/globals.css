@@ -1011,6 +1011,11 @@ body:has(.now-page) {
     border-right: 1px solid var(--border);
   }
 
+  body:has(.demo-bar) .app-nav {
+    padding-bottom: 5.5rem;
+    scroll-padding-bottom: 5.5rem;
+  }
+
   .app-nav-bar {
     display: block;
     padding: 1.25rem 1.25rem 0.5rem;

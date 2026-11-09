@@ -29,6 +29,10 @@ export default function AppNav() {
     const query = window.matchMedia("(min-width: 900px)");
     const onWide = (event: MediaQueryListEvent) => {
       if (event.matches) {
+        const active = document.activeElement;
+        if (active === closeRef.current || active === menuRef.current || active === document.body) {
+          panelRef.current?.querySelector<HTMLElement>(".primary-nav a")?.focus();
+        }
         setOpen(false);
       }
     };
