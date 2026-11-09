@@ -73,6 +73,12 @@ export async function main(): Promise<void> {
     DASH0_OTLP_ENDPOINT: process.env.DASH0_OTLP_ENDPOINT,
     DASH0_AUTH_TOKEN: process.env.DASH0_AUTH_TOKEN,
   });
+  try {
+    await ingest();
+  } finally { await telemetry.shutdown(); }
+}
+
+async function ingest(): Promise<void> {
   const options = parseOptions(process.argv.slice(2));
   const client = createElasticClient();
   const started = performance.now();
@@ -97,7 +103,7 @@ export async function main(): Promise<void> {
       return indexed;
     });
     console.log(`Total ingest elapsed ${((performance.now()-started)/1000).toFixed(2)}s.`);
-  } finally { await client.close(); await telemetry.shutdown(); }
+  } finally { await client.close(); }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
