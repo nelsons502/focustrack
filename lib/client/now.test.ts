@@ -93,6 +93,12 @@ describe("selectCurrentAndNext", () => {
     expect(result.next?.id).toBe("b");
   });
 
+  it("reports the last finished session of the same day during a gap", () => {
+    const now = new Date("2026-11-10T11:15:00-07:00");
+    const result = selectCurrentAndNext(all, plan, now);
+    expect(result.previous?.id).toBe("a");
+  });
+
   it("treats the end as exclusive", () => {
     const now = new Date("2026-11-10T11:00:00-07:00");
     expect(selectCurrentAndNext(all, plan, now).current).toBeNull();
@@ -110,6 +116,7 @@ describe("selectCurrentAndNext", () => {
     expect(selectCurrentAndNext(all, plan, now)).toEqual({
       current: null,
       next: null,
+      previous: null,
     });
   });
 });

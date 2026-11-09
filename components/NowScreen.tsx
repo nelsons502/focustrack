@@ -131,7 +131,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
   }, [mounted, planKey, retryToken]);
 
   const sessions = useMemo(() => Object.values(known), [known]);
-  const { current, next } = useMemo(
+  const { current, next, previous } = useMemo(
     () => selectCurrentAndNext(sessions, planIds, now),
     [sessions, planIds, now],
   );
@@ -213,7 +213,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
     focusAfterSkip.current = "skip";
   }
 
-  const nextNote = next ? transitionNote(current, next) : null;
+  const nextNote = next ? transitionNote(current ?? previous, next) : null;
   const ready = mounted && (planIds.length === 0 || !loadingIds || sessions.length > 0);
   const showEmpty = ready && !loadError && !current && !next;
 
@@ -370,7 +370,10 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
                       autoComplete="off"
                       enterKeyHint="done"
                       onChange={(event) =>
-                        setDraft({ text: event.target.value, sessionId: current.id })
+                        setDraft((previousDraft) => ({
+                          text: event.target.value,
+                          sessionId: previousDraft.sessionId || current.id,
+                        }))
                       }
                     />
                     <button type="submit" className="now-button now-button-primary">

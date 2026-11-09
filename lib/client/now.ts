@@ -36,7 +36,11 @@ function time(value: string): number {
   return new Date(value).getTime();
 }
 
-export type NowSelection = { current: Session | null; next: Session | null };
+export type NowSelection = {
+  current: Session | null;
+  next: Session | null;
+  previous: Session | null;
+};
 
 export function selectCurrentAndNext(
   sessions: Session[],
@@ -58,7 +62,12 @@ export function selectCurrentAndNext(
   const upcoming = valid
     .filter((s) => time(s.startsAt) > at && s.id !== current?.id)
     .sort((a, b) => time(a.startsAt) - time(b.startsAt));
-  return { current, next: upcoming[0] ?? null };
+  const next = upcoming[0] ?? null;
+  const previous =
+    valid
+      .filter((s) => time(s.endsAt) <= at && next !== null && s.day === next.day)
+      .sort((a, b) => time(b.endsAt) - time(a.endsAt))[0] ?? null;
+  return { current, next, previous };
 }
 
 export function minutesUntil(startsAt: string, now: Date): number {

@@ -173,4 +173,12 @@ describe("NowScreen", () => {
     ]);
     expect(screen.getByRole("button", { name: "Quick notes" })).toHaveFocus();
   });
+
+  it("keeps the transition note during a break after the previous session", async () => {
+    seedPlan(["cur", "nxt"]);
+    mockSessions([current, next]);
+    render(<NowScreen nowParam="2026-11-10T11:35-07:00" />);
+    expect(await screen.findByText(/level changes from Level 2 to Level 3/)).toBeInTheDocument();
+    expect(screen.queryByText("Happening now")).not.toBeInTheDocument();
+  });
 });
