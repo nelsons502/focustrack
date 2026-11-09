@@ -35,16 +35,17 @@ export default function ExportCalendarButton() {
   const [errorMessage, setErrorMessage] = useState("");
   const [missingCount, setMissingCount] = useState(0);
   const ids = localState.plan.sessionIds;
-  const empty = ids.length === 0;
+  const breaks = localState.plan.breaks ?? [];
+  const empty = ids.length === 0 && breaks.length === 0;
 
   async function handleExport() {
     setStatus("working");
     setErrorMessage("");
     try {
-      const sessions = await fetchSessionsByIds(
-        [...ids],
-        new AbortController().signal,
-      );
+      const sessions =
+        ids.length > 0
+          ? await fetchSessionsByIds([...ids], new AbortController().signal)
+          : [];
       const missing = ids.filter(
         (id) => !sessions.some((session) => session.id === id),
       );
@@ -52,7 +53,7 @@ export default function ExportCalendarButton() {
         const match = sessions.find((session) => session.id === id);
         return match ? [match] : [];
       });
-      if (ordered.length === 0) {
+      if (ordered.length === 0 && breaks.length === 0) {
         throw new Error(
           "None of the sessions in your plan are in the current schedule.",
         );
@@ -60,7 +61,7 @@ export default function ExportCalendarButton() {
       downloadFile(
         buildIcs(ordered, {
           notAttending: localState.plan.notAttending,
-          breaks: localState.plan.breaks,
+          breaks,
           now: new Date(),
         }),
       );
