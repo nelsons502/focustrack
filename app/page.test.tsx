@@ -1,6 +1,24 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import HomePage from "./page";
+
+beforeEach(() => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({ results: [], mode: "lexical-fallback", tookMs: 1 }),
+      } as Response),
+    ),
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("HomePage", () => {
   it("credits the schedule source with a link to Sessionize", () => {
@@ -19,5 +37,11 @@ describe("HomePage", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "FocusTrack" }),
     ).toBeInTheDocument();
+  });
+
+  it("puts the Find search near the top of the page", () => {
+    render(<HomePage />);
+    expect(screen.getByLabelText(/Search sessions/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
   });
 });
