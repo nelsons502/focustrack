@@ -26,6 +26,7 @@ import {
   breakOverlapsSessions,
   clampEnergySettings,
   formatMinutes,
+  hasRealBreakGap,
 } from "../../lib/client/plan";
 import { fetchSessionsByIds } from "../../lib/client/sessions-api";
 import {
@@ -141,21 +142,24 @@ export default function PlanView() {
         : [],
     [isCurrent, errorMessage, sessionIds, foundIds],
   );
-  const visibleBreaks = useMemo(
+  const canIntervene = isCurrent && !errorMessage;
+  const conflictingBreakIds = useMemo(
     () =>
-      sessionIds.length === 0 || isCurrent
-        ? planBreaks.filter((entry) => !breakOverlapsSessions(sessions, entry))
-        : [],
-    [sessionIds.length, isCurrent, planBreaks, sessions],
+      new Set(
+        planBreaks
+          .filter((entry) => breakOverlapsSessions(sessions, entry))
+          .map((entry) => entry.id),
+      ),
+    [planBreaks, sessions],
   );
   const days = useMemo(() => {
     const all = new Set(sessions.map((session) => session.day));
-    for (const entry of visibleBreaks) {
+    for (const entry of planBreaks) {
       const day = getEventDayKey(entry.startsAt);
       if (day) all.add(day);
     }
     return [...all].sort();
-  }, [sessions, visibleBreaks]);
+  }, [sessions, planBreaks]);
   const selectedDay =
     chosenDay && days.includes(chosenDay) ? chosenDay : (days[0] ?? null);
   const daySessions = useMemo(
@@ -168,11 +172,11 @@ export default function PlanView() {
   const dayBreaks = useMemo(
     () =>
       selectedDay
-        ? visibleBreaks.filter(
+        ? planBreaks.filter(
             (entry) => getEventDayKey(entry.startsAt) === selectedDay,
           )
         : [],
-    [visibleBreaks, selectedDay],
+    [planBreaks, selectedDay],
   );
   const timelineEntries = useMemo<TimelineEntry[]>(() => {
     const entries: TimelineEntry[] = [
@@ -218,6 +222,29 @@ export default function PlanView() {
   }
 
   function handleAddBreak(planBreak: PlanBreak) {
+    if (!canIntervene) {
+      setAnnouncement(
+        "Your saved sessions are still loading. Try adding the quiet-room break again in a moment.",
+      );
+      return;
+    }
+    if (breakOverlapsSessions(sessions, planBreak)) {
+      setAnnouncement(
+        "That quiet-room break overlaps a saved session, so it was not added.",
+      );
+      return;
+    }
+    const minutes =
+      (Date.parse(planBreak.endsAt) - Date.parse(planBreak.startsAt)) / 60_000;
+    if (
+      !Number.isFinite(minutes) ||
+      !hasRealBreakGap(sessions, planBreak.startsAt, minutes)
+    ) {
+      setAnnouncement(
+        "That quiet-room break no longer fits between your saved sessions, so it was not added.",
+      );
+      return;
+    }
     const next = addBreakToPlan(localState, planBreak);
     if (next === localState) {
       setAnnouncement("This quiet-room break is already in your plan.");
@@ -244,10 +271,29 @@ export default function PlanView() {
 
   function handleUndoRemoveBreak() {
     if (!removedBreak) return;
+    if (!canIntervene) {
+      setAnnouncement(
+        "Your saved sessions are still loading. Try undoing again in a moment.",
+      );
+      return;
+    }
     if (breakOverlapsSessions(sessions, removedBreak)) {
       setRemovedBreak(null);
       setAnnouncement(
         "That break no longer fits: it overlaps a saved session now.",
+      );
+      return;
+    }
+    const minutes =
+      (Date.parse(removedBreak.endsAt) - Date.parse(removedBreak.startsAt)) /
+      60_000;
+    if (
+      !Number.isFinite(minutes) ||
+      !hasRealBreakGap(sessions, removedBreak.startsAt, minutes)
+    ) {
+      setRemovedBreak(null);
+      setAnnouncement(
+        "That break no longer fits between your saved sessions.",
       );
       return;
     }
@@ -390,9 +436,18 @@ export default function PlanView() {
                   planBreak.startsAt,
                   planBreak.endsAt,
                 );
+                const conflicts =
+                  canIntervene && conflictingBreakIds.has(planBreak.id);
                 return (
                   <li key={planBreak.id}>
                     {gap ? <p className="timeline-gap">{gap}</p> : null}
+                    {conflicts ? (
+                      <p className="timeline-gap">
+                        This quiet-room break overlaps a saved session, so it
+                        does not count as time off. Remove it to clear the
+                        overlap.
+                      </p>
+                    ) : null}
                     <article className="card card-break">
                       <h3 className="card-title">Quiet-room break</h3>
                       <p className="card-time">
@@ -474,6 +529,7 @@ export default function PlanView() {
             dayLabel={formatEventDayLabel(selectedDay)}
             settings={settings}
             result={energyResult}
+            canIntervene={canIntervene}
             breaks={planBreaks}
             onDrop={(session) => removeById(session.id, session.title)}
             onAddBreak={handleAddBreak}

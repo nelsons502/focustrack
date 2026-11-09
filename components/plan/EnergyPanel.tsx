@@ -24,6 +24,7 @@ type EnergyPanelProps = {
   settings: EnergySettings;
   result: EnergyResult;
   breaks: PlanBreak[];
+  canIntervene: boolean;
   onDrop: (session: Session) => void;
   onAddBreak: (planBreak: PlanBreak) => void;
   onSettingsChange: (settings: EnergySettings) => void;
@@ -117,6 +118,7 @@ export default function EnergyPanel({
   settings,
   result,
   breaks,
+  canIntervene,
   onDrop,
   onAddBreak,
   onSettingsChange,
@@ -181,7 +183,7 @@ export default function EnergyPanel({
           ))}
         </ul>
       )}
-      {dropSession ? (
+      {canIntervene && dropSession ? (
         <div className="suggestion">
           <p>
             One option: drop “{dropSession.title}” to ease this day. You can
@@ -197,7 +199,7 @@ export default function EnergyPanel({
           </button>
         </div>
       ) : null}
-      {breakText ? (
+      {canIntervene && breakText ? (
         <div className="suggestion">
           <p>{breakText}</p>
           {breakCandidate ? (

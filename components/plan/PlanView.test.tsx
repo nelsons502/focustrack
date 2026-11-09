@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalState, PlanBreak, Session } from "../../lib/contract";
 import { QUIET_ROOM_260A } from "../../lib/contract";
@@ -429,7 +429,7 @@ describe("PlanView", () => {
     ).toBeInTheDocument();
   });
 
-  it("does not render a saved break that overlaps a saved session", async () => {
+  it("keeps an overlapping saved break visible, explained, and removable", async () => {
     savePlan(["a"], {}, [
       { ...gapBreak, startsAt: "2026-11-10T16:10:00.000Z", endsAt: "2026-11-10T16:40:00.000Z" },
     ]);
@@ -439,7 +439,174 @@ describe("PlanView", () => {
       await screen.findByRole("heading", { name: "Solo Talk" }),
     ).toBeInTheDocument();
     expect(
+      screen.getByRole("heading", { name: "Quiet-room break" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/overlaps a saved session/)).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: /Remove quiet-room break/ }),
+    );
+    await waitFor(() => expect(storedState().plan.breaks).toEqual([]));
+    expect(
       screen.queryByRole("heading", { name: "Quiet-room break" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("omits energy interventions while a new session lookup is pending", async () => {
+    savePlan(["a", "b", "c", "d"]);
+    const four = [
+      makeSession({ id: "a", title: "Talk A" }),
+      makeSession({
+        id: "b",
+        title: "Talk B",
+        startsAt: "2026-11-10T16:30:00Z",
+        endsAt: "2026-11-10T17:00:00Z",
+      }),
+      makeSession({
+        id: "c",
+        title: "Talk C",
+        startsAt: "2026-11-10T17:00:00Z",
+        endsAt: "2026-11-10T17:30:00Z",
+      }),
+      makeSession({
+        id: "d",
+        title: "Talk D",
+        startsAt: "2026-11-10T17:30:00Z",
+        endsAt: "2026-11-10T18:00:00Z",
+      }),
+    ];
+    const evening = makeSession({
+      id: "e",
+      title: "Evening Talk",
+      startsAt: "2026-11-10T23:00:00Z",
+      endsAt: "2026-11-10T23:30:00Z",
+    });
+    let releaseSecond: ((value: Response) => void) | null = null;
+    const fetchMock = vi.fn(async () => {
+      if (fetchMock.mock.calls.length === 1) return jsonResponse(four);
+      return new Promise<Response>((resolve) => {
+        releaseSecond = resolve;
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<PlanView />);
+    expect(
+      await screen.findByRole("button", { name: "Drop Talk D from plan" }),
+    ).toBeInTheDocument();
+    act(() => {
+      const current = storedState();
+      updateLocalState({
+        ...current,
+        plan: { ...current.plan, sessionIds: [...current.plan.sessionIds, "e"] },
+      });
+    });
+    expect(
+      await screen.findByText(/Loading your saved sessions/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Talk A" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Drop .* from plan/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Add quiet-room break/ }),
+    ).not.toBeInTheDocument();
+    act(() => {
+      releaseSecond?.(jsonResponse([...four, evening]));
+    });
+    expect(
+      await screen.findByRole("button", { name: "Drop Talk D from plan" }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not restore a removed break while a new lookup is pending", async () => {
+    savePlan(["a", "b"], {}, [gapBreak]);
+    const a = makeSession({ id: "a", title: "Expo Talk" });
+    const b = makeSession({
+      id: "b",
+      title: "Later Talk",
+      startsAt: "2026-11-10T17:00:00Z",
+      endsAt: "2026-11-10T17:30:00Z",
+    });
+    const evening = makeSession({
+      id: "e",
+      title: "Evening Talk",
+      startsAt: "2026-11-10T23:00:00Z",
+      endsAt: "2026-11-10T23:30:00Z",
+    });
+    let releaseSecond: ((value: Response) => void) | null = null;
+    const fetchMock = vi.fn(async () => {
+      if (fetchMock.mock.calls.length === 1) return jsonResponse([a, b]);
+      return new Promise<Response>((resolve) => {
+        releaseSecond = resolve;
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<PlanView />);
+    expect(
+      await screen.findByRole("heading", { name: "Quiet-room break" }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: /Remove quiet-room break/ }),
+    );
+    await waitFor(() => expect(storedState().plan.breaks).toEqual([]));
+    act(() => {
+      const current = storedState();
+      updateLocalState({
+        ...current,
+        plan: { ...current.plan, sessionIds: [...current.plan.sessionIds, "e"] },
+      });
+    });
+    expect(
+      await screen.findByText(/Loading your saved sessions/),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Undo/ }));
+    await waitFor(() => expect(storedState().plan.breaks).toEqual([]));
+    expect(screen.getByRole("button", { name: /Undo/ })).toBeInTheDocument();
+    act(() => {
+      releaseSecond?.(jsonResponse([a, b, evening]));
+    });
+    expect(
+      await screen.findByRole("button", { name: /Undo/ }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Undo/ }));
+    await waitFor(() =>
+      expect(storedState().plan.breaks).toEqual([gapBreak]),
+    );
+  });
+
+  it("does not restore a removed break that no longer sits in a real gap", async () => {
+    savePlan(["a", "b"], {}, [gapBreak]);
+    mockSessions([
+      makeSession({ id: "a", title: "Expo Talk" }),
+      makeSession({
+        id: "b",
+        title: "Later Talk",
+        startsAt: "2026-11-10T17:00:00Z",
+        endsAt: "2026-11-10T17:30:00Z",
+      }),
+    ]);
+    render(<PlanView />);
+    expect(
+      await screen.findByRole("heading", { name: "Quiet-room break" }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: /Remove quiet-room break/ }),
+    );
+    await waitFor(() => expect(storedState().plan.breaks).toEqual([]));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove from plan: Later Talk" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByText(/Loading your saved sessions/),
+      ).not.toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Undo/ }));
+    await waitFor(() => expect(storedState().plan.breaks).toEqual([]));
+    expect(screen.getByText(/no longer fits between/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Undo/ }),
     ).not.toBeInTheDocument();
   });
 
