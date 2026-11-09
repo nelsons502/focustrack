@@ -664,7 +664,7 @@ body:has(.now-page) {
 }
 
 .export-calendar-status:empty {
-  display: none;
+  margin: 0;
 }
 
 .export-calendar-status,
