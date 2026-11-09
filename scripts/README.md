@@ -21,6 +21,12 @@ Classification follows the authoritative `lib/contract.ts` parse rules. Overlaps
 
 The cache is validated before reuse: schedules must match their advertised unique entry count and parse successfully; detail pages must match their requested Session ID. Fresh downloads are validated and atomically renamed into place. Existing cached data is reused without a network request. The new `roomType`, `noiseEstimate`, and `noiseBasis` fields have explicit keyword mappings.
 
+## Plain-language summaries
+
+`data/summaries.json` holds AI-drafted, person-reviewed two-sentence summaries for the demo sessions, keyed by Sessionize ID, each with `summarySource: "ai-reviewed"`. This is our own text, not schedule data. Ingest merges it into matching sessions before indexing and logs any summary IDs outside the selection.
+
+To add summaries to an existing index without re-ingesting, run `npm run apply-summaries`. It sends one partial `_update` per entry with only `plainSummary` and `summarySource`, never upserts, and never creates, replaces, or deletes documents or the index. A missing session ID fails that entry and the script exits nonzero.
+
 Schedule data: CNCF / Sessionize.
 
 ## Judge explanation

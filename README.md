@@ -17,10 +17,14 @@ A big conference packs hundreds of sessions into a few days. For autistic, anxio
 
 | Area | Status | What you get |
 | --- | --- | --- |
-| Find | Live on main | Hybrid search (keyword plus semantic) over the real KubeCon NA 2026 schedule. Filter by day and hide restricted sessions (sold out, separate registration, all-access pass). Results show event-time schedule, room, speakers, and type. |
-| Plan | Search and on-device plan are live. Energy check is in progress ([PR #8](https://github.com/nelsons502/focustrack/pull/8)). | "Add to plan" saves session IDs on your device only. The energy check, in progress, flags too many sessions in a row, tight transitions, long days, and loud rooms with adjustable thresholds, and suggests the official quiet room. |
-| Be present | In progress ([PR #7](https://github.com/nelsons502/focustrack/pull/7)) | A calm Now screen for the session you are in. |
-| Plain-language summaries | In progress ([PR #6](https://github.com/nelsons502/focustrack/pull/6)) | Reviewed summaries for the demo sessions. |
+| Find (`/`) | Live | Hybrid search (keyword plus semantic) over the real KubeCon NA 2026 schedule. Filter by day and hide restricted sessions (sold out, separate registration, all-access pass). Results show event-time schedule, room, speakers, type, and a plain-language summary where one exists. |
+| Plan (`/plan`) | Live | Saved sessions as a timeline for the day you choose. An energy check, run on your device, flags too many sessions in a row, tight transitions (room, level, and building changes), long days, and loud rooms, with thresholds you can adjust. It can suggest dropping a session or saving a quiet-room break (Salt Palace, Level 2, 260A) in a real gap. |
+| Be present (`/now`) | Live | A calm Now screen: the session you are in, what is next, and a transition note, with on-device notes and "not attending". |
+| Plain-language summaries | Live for the demo sessions | AI-written ahead of time, checked, and labelled in `data/summaries.json`. Summarising more sessions autonomously is in progress. |
+| Calendar export | In progress ([PR #11](https://github.com/nelsons502/focustrack/pull/11)) | Export a plan to a calendar. |
+| Remember | In progress, optional ([PR #12](https://github.com/nelsons502/focustrack/pull/12)) | Optional on-device reflection. |
+
+Plans, notes, and settings are saved on your device. The Plan and Now pages send only the saved session IDs to the schedule service, and only after you choose to load them, to look up times and rooms. Notes, breaks, and settings are never sent.
 
 Honest accessibility data runs through all of it. Crowd and noise appear only as labelled estimates with their basis, or as "unknown", and never as "small" or "quiet". Caption and quiet-room information comes from the official accessibility page. If semantic search is unavailable, the API falls back to keyword search and the UI says so.
 
@@ -33,26 +37,27 @@ flowchart LR
   G[GitHub main] -->|Argo CD| N
   N -->|BM25 + semantic_text, fused by RRF| E
   B -.->|plan and notes stay on device| L[(localStorage)]
+  N -.->|OpenTelemetry| D[Dash0]
 ```
 
 Key decisions:
 
 - **Elastic is the only schedule store.** The `sessions` index holds the schedule's sessions (routine logistics such as registration and meals are dropped at ingest). Search, filters, and agenda lookups are Elasticsearch queries, not in-memory filtering.
 - **RRF instead of score blending.** Keyword (BM25) and `semantic_text` scores are on different scales. Reciprocal rank fusion merges the two ranked lists without tuning weights, and filters are applied inside both sub-queries.
-- **Personal data stays on the device.** Plan and settings live in `localStorage` (`focustrack:v1`). Nothing about your plan is sent to a server.
+- **Personal data stays on the device.** Plan, notes, breaks, and settings live in `localStorage` (`focustrack:v1`). Only saved session IDs are sent, after you choose to look them up.
 - **Estimates never claim "quiet".** Crowd is derived from room type and noise from the exhibit hall; a wrong reassurance harms noise-sensitive attendees, so everything else is "unknown". The rules are in `lib/contract.ts`.
 - **GitOps on Radar and Argo CD.** A push to `main` builds an image, updates `deploy/kustomization.yaml`, and Argo CD syncs the cluster. See [`docs/radar.md`](docs/radar.md).
 - **AI only ahead of time, apart from search.** Elastic's built-in inference embeds descriptions at ingest and the query at search time; no generative model runs in the app, and summaries are generated beforehand and reviewed.
 
 ## Sponsor tools and how we used them
 
-**Elastic.** Elastic Serverless is the core data layer: a `sessions` index with an explicit mapping, a `semantic_text` field using built-in inference, and an RRF retriever that fuses a BM25 `multi_match` with a semantic query. See [`lib/elastic.ts`](lib/elastic.ts) and [`lib/elastic-search.ts`](lib/elastic-search.ts). The `/readyz` probe also checks that Elastic is reachable.
+**Elastic.** Elastic Serverless (9.7.0) is the core data layer: a `sessions` index with an explicit mapping, a `semantic_text` field using built-in inference, and an RRF retriever that fuses a BM25 `multi_match` with a semantic query. See [`lib/elastic.ts`](lib/elastic.ts) and [`lib/elastic-search.ts`](lib/elastic-search.ts). The `/readyz` probe also checks that Elastic is reachable.
 
-**Gitar (Sonar).** Features land as separate pull requests. Project-aware review rules live in [`.gitar/review/conventions.md`](.gitar/review/conventions.md) (strict TypeScript, event time zones, Elastic as the data layer, RRF) and [`.gitar/review/product-principles.md`](.gitar/review/product-principles.md) (focus-first, accessibility, honest data, privacy). Gitar review findings and CI-failure fixes are visible on the [pull requests](https://github.com/nelsons502/focustrack/pulls?q=is%3Apr).
+**Gitar (Sonar).** Features land as separate pull requests, and Gitar reviewed and committed fixes (as gitar-bot) on PRs #3, #4, #5, and #8. Project-aware review rules live in [`.gitar/review/conventions.md`](.gitar/review/conventions.md) (strict TypeScript, event time zones, Elastic as the data layer, RRF) and [`.gitar/review/product-principles.md`](.gitar/review/product-principles.md) (focus-first, accessibility, honest data, privacy). Gitar review findings and CI-failure fixes are visible on the [pull requests](https://github.com/nelsons502/focustrack/pulls?q=is%3Apr).
 
-**Radar.** The app runs on Kubernetes in the team namespace, deployed by Argo CD from [`argocd/application.yaml`](argocd/application.yaml) and [`deploy/`](deploy/), with a GitHub Actions image workflow ([`.github/workflows/image.yml`](.github/workflows/image.yml)). Setup, probes, and the release flow are documented in [`docs/radar.md`](docs/radar.md). Planned: a Radar AI investigation of the running app and before/after Checks screenshots. These are not done yet.
+**Radar.** The app runs on Kubernetes in the team namespace, deployed by Argo CD from [`argocd/application.yaml`](argocd/application.yaml) and [`deploy/`](deploy/), with a GitHub Actions image workflow ([`.github/workflows/image.yml`](.github/workflows/image.yml)). Setup, probes, and the release flow are documented in [`docs/radar.md`](docs/radar.md). A Radar AI investigation of the running app (`chat_ie6DbFJiQMGlhJN_`) was an all-clear that recommended a PodDisruptionBudget, which PR #15 added ([`deploy/pdb.yaml`](deploy/pdb.yaml)). Radar Checks went from 4 medium findings (12:56 MT) to 0 (14:04 MT) after that PR.
 
-**Dash0.** Planned, not yet on main: OpenTelemetry traces and logs around Elastic calls and browser monitoring.
+**Dash0.** Server-side OpenTelemetry (traces, metrics, logs) around Elastic calls is on main, exported through privacy-filtering exporters that never send queries, plans, or schedule text; see [`docs/observability.md`](docs/observability.md). Verifying live telemetry in Dash0 and an SLO dashboard are in progress.
 
 ## Accessibility
 
@@ -81,7 +86,7 @@ Deploying: Kubernetes through Argo CD (see [`docs/radar.md`](docs/radar.md)), or
 
 ## Data and credit
 
-Schedule data: CNCF / Sessionize ([source](https://sessionize.com/api/v2/uo948i5p/view/markdown)). The repository holds no schedule data beyond short test-fixture excerpts; ingest fetches the schedule at runtime. Plain-language summaries (in progress, [PR #6](https://github.com/nelsons502/focustrack/pull/6)) are AI-written, checked, and labelled as such in the app.
+Schedule data: CNCF / Sessionize ([source](https://sessionize.com/api/v2/uo948i5p/view/markdown)). The repository holds no schedule data beyond short test-fixture excerpts; ingest fetches the schedule at runtime. Plain-language summaries in `data/summaries.json` are AI-written, checked, and labelled as such in the app (`npm run apply-summaries` writes them to the index).
 
 ## AI disclosure
 
