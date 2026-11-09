@@ -4,6 +4,7 @@ import "./errors.css";
 import Link from "next/link";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { withNowParam } from "../lib/client/now";
+import { setNowOptOut } from "../components/now/now-helpers";
 
 function subscribe(onStoreChange: () => void): () => void {
   window.addEventListener("popstate", onStoreChange);
@@ -39,7 +40,7 @@ export default function NotFoundPage() {
           screen to see what’s on.
         </p>
         <nav aria-label="Recovery" className="error-nav">
-          <Link className="error-nav-link" href={withNowParam("/", raw)}>
+          <Link className="error-nav-link" href={withNowParam("/", raw)} onClick={() => setNowOptOut()}>
             Find
           </Link>
           <Link className="error-nav-link" href={withNowParam("/plan", raw)}>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useSyncExternalStore, type CSSProperties } from "react";
 import { withNowParam } from "../lib/client/now";
+import { setNowOptOut } from "../components/now/now-helpers";
 
 function subscribe(onStoreChange: () => void): () => void {
   window.addEventListener("popstate", onStoreChange);
@@ -123,6 +124,7 @@ export default function GlobalErrorPage({
                 <a
                   key={link.label}
                   href={withNowParam(link.path, raw)}
+                  onClick={link.path === "/" ? () => setNowOptOut() : undefined}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",

@@ -3,6 +3,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import ErrorPage from "./error";
 import GlobalErrorPage from "./global-error";
 import NotFoundPage from "./not-found";
+import { NOW_OPT_OUT_KEY } from "../lib/contract";
+
+describe("recovery navigation", () => {
+  it.each([ErrorPage, GlobalErrorPage, NotFoundPage])("keeps an explicit Find recovery from returning to Now", (Page) => {
+    sessionStorage.removeItem(NOW_OPT_OUT_KEY);
+    render(<Page error={new Error("boom")} reset={vi.fn()} />);
+    fireEvent.click(screen.getByRole("link", { name: "Find" }));
+    expect(sessionStorage.getItem(NOW_OPT_OUT_KEY)).toBe("1");
+  });
+});
 
 describe("ErrorPage", () => {
   afterEach(() => {
