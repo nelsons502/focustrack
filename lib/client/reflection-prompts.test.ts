@@ -70,3 +70,13 @@ describe("lowercase versus", () => {
     });
   });
 });
+
+describe("term spelling", () => {
+  it("preserves gRPC and multiword or pairs", () => {
+    expect(findContrast("gRPC vs REST for APIs")).toEqual({ first: "gRPC", second: "REST" });
+    expect(findContrast("Service Mesh or Ambient Mesh?")).toEqual({
+      first: "Service Mesh",
+      second: "Ambient Mesh",
+    });
+  });
+});

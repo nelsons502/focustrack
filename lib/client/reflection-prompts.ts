@@ -5,26 +5,59 @@ export type ReflectionPrompts = {
   contrast: { first: string; second: string } | null;
 };
 
-const TERM = String.raw`[A-Z][\w.+-]*(?: [A-Z][\w.+-]*)?`;
-const VERSUS = new RegExp(`(${TERM})\\s+(?:vs\\.?|versus)\\s+(${TERM})`);
-const VERSUS_LOWER = /(?:^|\s)([A-Za-z][\w.+-]*)\s+(?:vs\.?|versus)\s+([A-Za-z][\w.+-]*)/;
-// Plain "or" is far noisier than "vs", so only a single capitalised word on each side counts.
-const OR_PAIR = /\b([A-Z][\w.+-]*) or ([A-Z][\w.+-]*)\b/;
+const VERSUS_WORDS = new Set(["vs", "vs.", "versus"]);
 
 function clean(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
+function stripPunctuation(word: string): string {
+  return word.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9+#]+$/g, "");
+}
+
+function startsUpper(word: string): boolean {
+  return /^[A-Z]/.test(word);
+}
+
+function hasUpper(word: string): boolean {
+  return /[A-Z]/.test(word);
+}
+
+function joinTerm(words: string[], index: number, step: 1 | -1): string {
+  const parts = [words[index]];
+  let next = index + step;
+  while (
+    parts.length < 2 &&
+    startsUpper(parts[0]) &&
+    words[next] !== undefined &&
+    startsUpper(words[next]) &&
+    !/[.,;:!?]$/.test(step === 1 ? parts[parts.length - 1] : words[next])
+  ) {
+    parts.push(words[next]);
+    next += step;
+  }
+  if (step === -1) parts.reverse();
+  return parts.map(stripPunctuation).join(" ");
+}
+
 export function findContrast(
   description: string,
 ): { first: string; second: string } | null {
-  const text = clean(description);
-  const match = VERSUS.exec(text) ?? VERSUS_LOWER.exec(text) ?? OR_PAIR.exec(text);
-  if (!match) return null;
-  const first = match[1].trim();
-  const second = match[2].trim();
-  if (first.toLowerCase() === second.toLowerCase()) return null;
-  return { first, second };
+  const words = clean(description).split(" ");
+  for (let i = 1; i < words.length - 1; i += 1) {
+    const marker = words[i].toLowerCase();
+    const isVersus = VERSUS_WORDS.has(marker);
+    if (!isVersus && marker !== "or") continue;
+    const before = stripPunctuation(words[i - 1]);
+    const after = stripPunctuation(words[i + 1]);
+    if (!before || !after) continue;
+    if (!isVersus && !(hasUpper(before) && hasUpper(after))) continue;
+    const first = joinTerm(words, i - 1, -1);
+    const second = joinTerm(words, i + 1, 1);
+    if (first.toLowerCase() === second.toLowerCase()) continue;
+    return { first, second };
+  }
+  return null;
 }
 
 export function buildReflectionPrompts(
