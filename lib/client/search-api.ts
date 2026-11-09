@@ -145,3 +145,29 @@ export async function fetchSearch(
     tookMs: typeof body.tookMs === "number" ? body.tookMs : 0,
   };
 }
+
+export async function fetchSessionsByIds(
+  ids: readonly string[],
+  signal?: AbortSignal,
+): Promise<Session[]> {
+  const unavailable = "Your sessions could not be loaded. Please try again shortly.";
+  if (ids.length === 0) return [];
+  let response: Response;
+  try {
+    response = await fetch(
+      `/api/sessions?ids=${encodeURIComponent(ids.join(","))}`,
+      { signal, headers: { Accept: "application/json" } },
+    );
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new Error(unavailable);
+  }
+  let body: unknown;
+  try {
+    body = (await response.json()) as unknown;
+  } catch {
+    throw new Error(unavailable);
+  }
+  if (!response.ok || !Array.isArray(body)) throw new Error(unavailable);
+  return body.filter(isSession);
+}

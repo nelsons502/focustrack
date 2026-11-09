@@ -1,3 +1,4 @@
+import ExportCalendarButton from "../components/ExportCalendarButton";
 import FindSearch from "../components/FindSearch";
 
 const SCHEDULE_SOURCE_URL =
@@ -14,6 +15,7 @@ export default function HomePage() {
         </p>
       </header>
       <FindSearch />
+      <ExportCalendarButton />
       <footer className="credit">
         <a href={SCHEDULE_SOURCE_URL}>Schedule data: CNCF / Sessionize</a>
       </footer>
