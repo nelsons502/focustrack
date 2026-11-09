@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LOCAL_STATE_KEY, type LocalState, type Session } from "../lib/contract";
+import { startSim, stopSim } from "../lib/client/clock";
 
 function makeSession(overrides: Partial<Session> = {}): Session {
   return {
@@ -32,6 +33,8 @@ async function renderFresh() {
 }
 
 beforeEach(() => {
+  stopSim();
+  window.sessionStorage.clear();
   localStorage.clear();
   window.history.pushState({}, "", "/reflect?now=2026-11-10T11:00-07:00");
   vi.stubGlobal(
@@ -43,6 +46,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  stopSim();
+  window.sessionStorage.clear();
   vi.unstubAllGlobals();
 });
 
@@ -89,6 +94,52 @@ describe("ReflectView", () => {
     fireEvent.click(screen.getByRole("button", { name: /Back to today/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Night-of recap" }));
     await waitFor(() => expect(screen.getByText("Reconcile loops")).toBeInTheDocument());
+  });
+
+  it("follows the shared sim clock without a ?now= param", async () => {
+    window.history.pushState({}, "", "/reflect");
+    seed({ plan: { sessionIds: ["s1"], notAttending: [] } });
+    startSim("2026-11-10T08:00:00-07:00", 60);
+    await renderFresh();
+    expect(await screen.findByText(/No talks have ended yet/)).toBeInTheDocument();
+    stopSim();
+    startSim("2026-11-10T11:00:00-07:00", 60);
+    expect(
+      await screen.findByRole("button", { name: /Reflect on Scaling Controllers/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the open form and unsaved answer when the clock crosses midnight", async () => {
+    window.history.pushState({}, "", "/reflect");
+    seed({ plan: { sessionIds: ["s1"], notAttending: [] } });
+    startSim("2026-11-10T23:59:00-07:00", 60);
+    await renderFresh();
+    fireEvent.click(await screen.findByRole("button", { name: /Reflect on Scaling Controllers/ }));
+    const answer = await screen.findByLabelText(/Your answer/);
+    fireEvent.change(answer, { target: { value: "Still writing at midnight" } });
+    answer.focus();
+    expect(document.activeElement).toBe(answer);
+
+    stopSim();
+    startSim("2026-11-11T00:01:00-07:00", 60);
+
+    const retained = await screen.findByLabelText(/Your answer/);
+    expect(retained).toBe(answer);
+    expect(retained).toHaveValue("Still writing at midnight");
+    expect(document.activeElement).toBe(answer);
+  });
+
+  it("stamps a saved reflection with the shared clock, not real time", async () => {
+    window.history.pushState({}, "", "/reflect");
+    seed({ plan: { sessionIds: ["s1"], notAttending: [] } });
+    startSim("2026-11-10T11:00:00-07:00", 60);
+    await renderFresh();
+    fireEvent.click(await screen.findByRole("button", { name: /Reflect on Scaling Controllers/ }));
+    fireEvent.change(screen.getByLabelText(/Your answer/), { target: { value: "Sim time" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save on this device" }));
+    expect(await screen.findByText("Saved. You can close this.")).toBeInTheDocument();
+    const stored = JSON.parse(localStorage.getItem(LOCAL_STATE_KEY) ?? "{}") as LocalState;
+    expect(stored.reflections?.s1.at.startsWith("2026-11-10T18:")).toBe(true);
   });
 
   it("only fetches the schedule, never posts reflections", async () => {

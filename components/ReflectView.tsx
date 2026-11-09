@@ -9,6 +9,7 @@ import {
   type FormEvent,
 } from "react";
 import type { LocalState, Session } from "../lib/contract";
+import { getNow, useNow } from "../lib/client/clock";
 import {
   getLocalStateServerSnapshot,
   getLocalStateSnapshot,
@@ -23,7 +24,7 @@ import {
 } from "../lib/client/reflection";
 import { buildReflectionPrompts } from "../lib/client/reflection-prompts";
 import { fetchSessionsByIds } from "../lib/client/sessions-api";
-import { formatEventInstant, formatEventRange, parseDemoNow } from "../lib/client/time";
+import { formatEventInstant, formatEventRange } from "../lib/client/time";
 
 type View = { kind: "list" } | { kind: "session"; id: string } | { kind: "recap" };
 type LoadStatus = "loading" | "success" | "error";
@@ -58,20 +59,20 @@ export default function ReflectView() {
     getLocationSearch,
     getLocationSearchServer,
   );
-  const demoNow = useMemo(
-    () => parseDemoNow(new URLSearchParams(locationSearch).get("now")),
-    [locationSearch],
-  );
+  // Shared clock follows the 60x demo sim (and ?now= via getNow) and ticks
+  // every second, so a talk appears here as soon as it ends in demo time.
+  const now = useNow(1000);
+  const clockReady = now.getTime() !== 0;
   const homeHref = useMemo(() => {
-    const now = new URLSearchParams(locationSearch).get("now");
-    return demoNow && now ? `/?now=${encodeURIComponent(now)}` : "/";
-  }, [locationSearch, demoNow]);
+    const param = new URLSearchParams(locationSearch).get("now");
+    return param ? `/?now=${encodeURIComponent(param)}` : "/";
+  }, [locationSearch]);
 
   const [sessions, setSessions] = useState<Session[]>([]);
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [retry, setRetry] = useState(0);
-  const [tick, setTick] = useState(0);
   const [view, setView] = useState<View>({ kind: "list" });
+  const [openSession, setOpenSession] = useState<Session | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const idsKey = plannedIds(localState).join(",");
 
@@ -91,27 +92,26 @@ export default function ReflectView() {
   }, [idsKey, retry]);
 
   useEffect(() => {
-    if (demoNow) return;
-    const timer = window.setInterval(() => setTick((n) => n + 1), 60_000);
-    return () => window.clearInterval(timer);
-  }, [demoNow]);
-
-  useEffect(() => {
     headingRef.current?.focus();
   }, [view]);
 
-  // tick only exists to re-render each minute so newly ended talks appear
-  void tick;
-  const now = demoNow ?? new Date();
-  const ended = selectEndedToday(sessions, localState, now);
+  const ended = clockReady ? selectEndedToday(sessions, localState, now) : [];
   const recap = savedReflections(ended, localState);
+  // The open form is not clock-filtered: crossing midnight (at 60x, a real
+  // second) must not unmount it and discard the unsaved answer or focus.
+  // The "today" filter applies to the list and recap only.
   const selected =
     view.kind === "session"
-      ? ended.find((session) => session.id === view.id)
+      ? openSession?.id === view.id
+        ? openSession
+        : sessions.find((session) => session.id === view.id)
       : undefined;
 
-  const demoLabel = demoNow ? (
-    <p className="reflect-meta">Demo time: {formatEventInstant(demoNow)}</p>
+  const nowLabel = clockReady ? (
+    <p className="reflect-meta reflect-now">
+      Right now:{" "}
+      <time dateTime={now.toISOString()}>{formatEventInstant(now)}</time>
+    </p>
   ) : null;
 
   if (view.kind === "session" && selected) {
@@ -121,30 +121,48 @@ export default function ReflectView() {
         session={selected}
         localState={localState}
         headingRef={headingRef}
-        onBack={() => setView({ kind: "list" })}
+        onBack={() => {
+          setOpenSession(null);
+          setView({ kind: "list" });
+        }}
       />
     );
   }
 
   if (view.kind === "recap") {
     return (
-      <section aria-labelledby="reflect-title">
+      <section aria-labelledby="reflect-title" className="reflect-page reflect-recap">
         <h1 id="reflect-title" ref={headingRef} tabIndex={-1} className="reflect-heading">
           Night-of recap
         </h1>
-        <p className="reflect-intro">Your reflections from today. {PRIVACY_COPY}</p>
+        <p className="reflect-intro">
+          A calm look back at today, in your own words. {PRIVACY_COPY}
+        </p>
+        {nowLabel}
         {recap.length === 0 ? (
-          <p>No reflections saved yet. Pick a talk to write one, or skip this entirely.</p>
+          <div className="reflect-empty">
+            <p role="status">
+              No reflections saved yet. Pick a talk to write one, or skip this entirely.
+            </p>
+          </div>
         ) : (
-          <ul className="reflect-list">
-            {recap.map(({ session, reflection }) => (
-              <li key={session.id} className="reflect-item">
-                <h2>{session.title}</h2>
-                <p className="reflect-meta">{reflection.prompt}</p>
-                <p>{reflection.answer}</p>
-              </li>
-            ))}
-          </ul>
+          <>
+            <p className="reflect-meta">
+              {recap.length === 1
+                ? "1 reflection saved today."
+                : `${recap.length} reflections saved today.`}
+            </p>
+            <ul className="reflect-list">
+              {recap.map(({ session, reflection }) => (
+                <li key={session.id} className="reflect-item reflect-recap-item">
+                  <h2>{session.title}</h2>
+                  <p className="reflect-meta">{formatEventRange(session.startsAt, session.endsAt)}</p>
+                  <p className="reflect-prompt">{reflection.prompt}</p>
+                  <p className="reflect-answer-text">{reflection.answer}</p>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
         <div className="reflect-actions">
           <button type="button" className="button" onClick={() => setView({ kind: "list" })}>
@@ -156,18 +174,18 @@ export default function ReflectView() {
   }
 
   return (
-    <section aria-labelledby="reflect-title">
+    <section aria-labelledby="reflect-title" className="reflect-page">
       <h1 id="reflect-title" ref={headingRef} tabIndex={-1} className="reflect-heading">
         Talks you attended today
       </h1>
       <p className="reflect-intro">
         A few optional questions to help you keep what mattered. {PRIVACY_COPY}
       </p>
-      {demoLabel}
-      {status === "loading" ? (
+      {nowLabel}
+      {!clockReady || status === "loading" ? (
         <p role="status">Loading your talks&hellip;</p>
       ) : status === "error" ? (
-        <div className="state-error" role="alert">
+        <div className="state-box state-error" role="alert">
           <p>Your talks could not be loaded. Nothing you saved is lost.</p>
           <button type="button" className="button" onClick={() => {
               setStatus("loading");
@@ -177,35 +195,48 @@ export default function ReflectView() {
           </button>
         </div>
       ) : ended.length === 0 ? (
-        <p role="status">
-          No talks have ended yet. Come back after one finishes, or skip this: it is optional.
-        </p>
+        <div className="reflect-empty">
+          <p role="status">
+            No talks have ended yet. Come back after one finishes, or skip this: it is optional.
+          </p>
+        </div>
       ) : (
-        <ul className="reflect-list">
-          {ended.map((session) => {
-            const done = Boolean(localState.reflections?.[session.id]?.answer);
-            return (
-              <li key={session.id} className="reflect-item">
-                <h2>{session.title}</h2>
-                <p className="reflect-meta">
-                  {formatEventRange(session.startsAt, session.endsAt)}
-                  {done ? " · Reflection saved" : ""}
-                </p>
-                <button
-                  type="button"
-                  className="button button-primary"
-                  aria-label={`${done ? "Edit reflection for" : "Reflect on"} ${session.title}`}
-                  onClick={() => setView({ kind: "session", id: session.id })}
-                >
-                  {done ? "Edit reflection" : "Reflect"}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <p className="reflect-meta">
+            {ended.length === 1 ? "1 talk ended today." : `${ended.length} talks ended today.`}
+          </p>
+          <ul className="reflect-list">
+            {ended.map((session) => {
+              const done = Boolean(localState.reflections?.[session.id]?.answer);
+              return (
+                <li key={session.id} className="reflect-item">
+                  <h2>{session.title}</h2>
+                  <p className="reflect-meta">
+                    {formatEventRange(session.startsAt, session.endsAt)}
+                  </p>
+                  {session.room ? <p className="reflect-place">{session.room}</p> : null}
+                  {done ? <p className="reflect-saved">Reflection saved</p> : null}
+                  <div className="reflect-actions reflect-item-actions">
+                    <button
+                      type="button"
+                      className="button button-primary"
+                      aria-label={`${done ? "Edit reflection for" : "Reflect on"} ${session.title}`}
+                      onClick={() => {
+                        setOpenSession(session);
+                        setView({ kind: "session", id: session.id });
+                      }}
+                    >
+                      {done ? "Edit reflection" : "Reflect"}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
       <div className="reflect-actions">
-        {status === "success" ? (
+        {status === "success" && clockReady ? (
           <button type="button" className="button" onClick={() => setView({ kind: "recap" })}>
             Night-of recap
           </button>
@@ -246,7 +277,7 @@ function ReflectForm({
       setMessage("Write a few words first, or go back. Nothing is required.");
       return;
     }
-    const saved = updateLocalState(withReflection(localState, session.id, prompt, answer, new Date()));
+    const saved = updateLocalState(withReflection(localState, session.id, prompt, answer, getNow()));
     if (saved) {
       setTone("ok");
       setMessage("Saved. You can close this.");
@@ -257,7 +288,7 @@ function ReflectForm({
   }
 
   return (
-    <section aria-labelledby="reflect-title">
+    <section aria-labelledby="reflect-title" className="reflect-page">
       <h1 id="reflect-title" ref={headingRef} tabIndex={-1} className="reflect-heading">
         {session.title}
       </h1>
@@ -274,7 +305,7 @@ function ReflectForm({
           </ul>
         </div>
       ) : null}
-      <form onSubmit={onSubmit}>
+      <form onSubmit={onSubmit} className="reflect-form">
         <fieldset className="reflect-fieldset">
           <legend>Pick one question</legend>
           {prompts.map((text) => (
