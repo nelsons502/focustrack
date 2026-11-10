@@ -1164,6 +1164,10 @@ body:has(.now-page) .app-nav a:focus-visible {
 }
 
 @media (max-width: 899px) {
+  html {
+    scroll-padding-top: calc(var(--nav-bar-height) + 1rem);
+  }
+
   .app-nav {
     position: sticky;
     top: 0;

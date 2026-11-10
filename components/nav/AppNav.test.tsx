@@ -108,6 +108,18 @@ describe("AppNav", () => {
     expect(screen.getByRole("link", { name: "Play my day" })).toHaveAttribute("href", `/demo?now=${encoded}`);
     expect(screen.getByText("Your day")).toBeInTheDocument();
   });
+
+  it("updates ?now= on links after popstate", () => {
+    render(<AppNav />);
+    const next = "2026-11-10T14:00-07:00";
+    act(() => {
+      window.history.pushState({}, "", `/now?now=${encodeURIComponent(next)}`);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    const encoded = encodeURIComponent(next);
+    expect(screen.getByRole("link", { name: "Play my day" })).toHaveAttribute("href", `/demo?now=${encoded}`);
+    expect(screen.getByRole("link", { name: /Settings/ })).toHaveAttribute("href", `/settings?now=${encoded}`);
+  });
 });
 
 it("moves focus to visible navigation when an open mobile menu becomes wide", () => {
