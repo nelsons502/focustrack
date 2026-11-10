@@ -9,6 +9,7 @@ import {
 } from "../lib/event";
 import { formatEventRange } from "../lib/client/time";
 import { passesGuardrail } from "../lib/summary-guardrail";
+import "./session-card.css";
 
 const RESTRICTION_LABELS: Record<Restriction, string> = {
   "sold-out": "Sold out",
@@ -80,26 +81,16 @@ export default function SessionCard({
     session.noiseBasis,
   );
   return (
-    <article className="card">
-      <div className="card-head">
-        <h3 className="card-title">{session.title}</h3>
-        <ul className="chips" aria-label="Session details">
-          <li className="chip chip-kind">{KIND_LABELS[session.kind]}</li>
-          {session.restrictions.map((restriction) => (
-            <li key={restriction} className="chip chip-restriction">
-              {RESTRICTION_LABELS[restriction]}
-            </li>
-          ))}
-        </ul>
-      </div>
-      <p className="card-time">
-        <time dateTime={session.startsAt}>
+    <article className="card session-card">
+      <h3 className="card-title session-card__title">{session.title}</h3>
+      <p className="session-card__when">
+        <time className="session-card__time" dateTime={session.startsAt}>
           {formatEventRange(session.startsAt, session.endsAt)}
         </time>
+        {place ? <span className="session-card__place">{place}</span> : null}
       </p>
-      {place ? <p className="card-place">{place}</p> : null}
       {session.speakers.length > 0 ? (
-        <p className="card-speakers">
+        <p className="card-speakers session-card__speakers">
           {session.speakers
             .map((speaker) =>
               speaker.company
@@ -109,13 +100,23 @@ export default function SessionCard({
             .join(", ")}
         </p>
       ) : null}
-      {session.plainSummary?.trim() ? (
-        <p className="card-summary">
+      <ul className="chips session-card__chips" aria-label="Session details">
+        <li className="chip chip-kind">{KIND_LABELS[session.kind]}</li>
+        {session.restrictions.map((restriction) => (
+          <li key={restriction} className="chip chip-restriction">
+            {RESTRICTION_LABELS[restriction]}
+          </li>
+        ))}
+        <li className="chip session-card__chip--estimate">{crowd}</li>
+        <li className="chip session-card__chip--estimate">{noise}</li>
+      </ul>
+      {session.summarySource === "ai-reviewed" && session.plainSummary?.trim() ? (
+        <p className="card-summary session-card__summary">
           <strong>AI summary (reviewed):</strong>{" "}
           {session.plainSummary.trim()}
         </p>
       ) : passesGuardrail(session.autoSummary, session) ? (
-        <p className="card-summary">
+        <p className="card-summary session-card__summary">
           <strong>AI summary (automatic, not reviewed):</strong>{" "}
           {session.autoSummary}
         </p>
@@ -139,25 +140,23 @@ export default function SessionCard({
             </button>
         </>
       ) : null}
-      <ul className="card-facts">
-        <li>{crowd}</li>
-        <li>{noise}</li>
-        <li>
-          {session.captions === "wordly-breakout"
-            ? ACCESSIBILITY_FACTS.captionsWordly
-            : ACCESSIBILITY_FACTS.captionsUnconfirmed}
-        </li>
-        <li>{ACCESSIBILITY_FACTS.seating}</li>
-        <li>{ACCESSIBILITY_FACTS.quietRoom}</li>
-      </ul>
-      <details className="card-details">
-        <summary>About quiet rooms</summary>
+      <details className="card-details session-card__access">
+        <summary>Accessibility at this venue</summary>
+        <ul className="session-card__access-list">
+          <li>
+            {session.captions === "wordly-breakout"
+              ? ACCESSIBILITY_FACTS.captionsWordly
+              : ACCESSIBILITY_FACTS.captionsUnconfirmed}
+          </li>
+          <li>{ACCESSIBILITY_FACTS.seating}</li>
+          <li>{ACCESSIBILITY_FACTS.quietRoom}</li>
+        </ul>
         <p>{ACCESSIBILITY_FACTS.quietRoomAbout}</p>
+        <p className="card-source">
+          Source:{" "}
+          <a href={ACCESSIBILITY_SOURCE_URL}>{ACCESSIBILITY_SOURCE_LABEL}</a>
+        </p>
       </details>
-      <p className="card-source">
-        Source:{" "}
-        <a href={ACCESSIBILITY_SOURCE_URL}>{ACCESSIBILITY_SOURCE_LABEL}</a>
-      </p>
       <div className="card-actions">
         <button
           type="button"
@@ -166,14 +165,9 @@ export default function SessionCard({
           onClick={() => onTogglePlan(session)}
         >
           {inPlan ? <span aria-hidden="true">✓ </span> : null}
-          Add to plan
+          {inPlan ? "In your plan" : "Add to plan"}
           <span className="visually-hidden">: {session.title}</span>
         </button>
-        {inPlan ? (
-          <span className="plan-state" aria-hidden="true">
-            In your plan
-          </span>
-        ) : null}
         {session.sourceUrl ? (
           <a className="card-link" href={session.sourceUrl}>
             Session source

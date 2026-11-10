@@ -1,0 +1,76 @@
+.session-card {
+  font-family: "Nunito Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.session-card__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+  line-height: 1.3;
+}
+
+.session-card__when {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.6rem;
+  margin: 0 0 0.25rem;
+}
+
+.session-card__time {
+  font-weight: 700;
+}
+
+.session-card__place {
+  color: var(--muted);
+}
+
+.session-card__speakers {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.session-card__chips {
+  margin: 0 0 0.6rem;
+}
+
+.session-card__chip--estimate {
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-weight: 500;
+}
+
+.session-card__summary {
+  margin: 0.35rem 0 0;
+  line-height: 1.55;
+}
+
+.session-card__summary strong {
+  color: var(--accent-dark);
+}
+
+.session-card__access {
+  margin-top: 0.6rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--border);
+}
+
+.session-card__access > summary {
+  font-weight: 600;
+  color: var(--fg);
+  border-radius: 8px;
+}
+
+.session-card__access-list {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 1.2rem;
+}
+
+.session-card__access-list li {
+  margin: 0.2rem 0;
+}
+
+.session-card__access p {
+  margin: 0 0 0.5rem;
+}
