@@ -529,6 +529,7 @@ describe("FindSearch", () => {
     mockSearch({ results: many, mode: "lexical-fallback", tookMs: 1 });
     render(<FindSearch />);
     expect(await screen.findByText("Showing 30 sessions")).toBeInTheDocument();
+    expect(screen.getByText(/Showing the first 30 — narrow your search/)).toBeInTheDocument();
     expect(
       screen.queryByText("Showing 30 of 30 sessions"),
     ).not.toBeInTheDocument();
