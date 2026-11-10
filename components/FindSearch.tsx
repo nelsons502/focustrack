@@ -253,12 +253,16 @@ export default function FindSearch() {
 
   const planIds = new Set(localState.plan.sessionIds);
   const visibleResults = results.slice(0, visibleCount);
+  const capHint =
+    results.length >= FIND_RESULT_LIMIT
+      ? ` Showing the first ${FIND_RESULT_LIMIT} — narrow your search to see others.`
+      : "";
   const statusText =
     status === "loading"
       ? "Searching…"
       : status === "error"
         ? "Search could not be completed."
-        : `${modeLabel(submittedQuery, mode)}. ${showingText(visibleResults.length, results.length)}.`;
+        : `${modeLabel(submittedQuery, mode)}. ${showingText(visibleResults.length, results.length)}.${capHint}`;
 
   return (
     <section aria-labelledby="find-heading" className="find">
@@ -364,8 +368,11 @@ export default function FindSearch() {
           <p className="results-meta">
             {showingText(visibleResults.length, results.length)}
           </p>
-          {results.length === FIND_RESULT_LIMIT ? (
-            <p className="results-meta">Showing the first 30 — narrow your search to see others.</p>
+          {results.length >= FIND_RESULT_LIMIT ? (
+            <p className="results-meta">
+              Showing the first {FIND_RESULT_LIMIT} — narrow your search to see
+              others.
+            </p>
           ) : null}
           <ul className="results" ref={resultsListRef}>
             {visibleResults.map((session) => (
