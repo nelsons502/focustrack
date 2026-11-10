@@ -1,4 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalState, SearchResponse, Session } from "../lib/contract";
 import { LOCAL_STATE_KEY } from "../lib/contract";
@@ -361,7 +363,7 @@ describe("FindSearch", () => {
     expect(fetchMock.mock.calls.length).toBe(callsBefore + 1);
   });
 
-  it("does not search on query typing alone; the query needs Search", async () => {
+  it("does not search or persist a query on typing alone; the query needs Search", async () => {
     const fetchMock = mockSearch({
       results: [makeSession()],
       mode: "lexical-fallback",
@@ -377,6 +379,7 @@ describe("FindSearch", () => {
     });
     await new Promise((resolve) => setTimeout(resolve, 400));
     expect(fetchMock.mock.calls.length).toBe(callsBefore);
+    expect(window.sessionStorage.getItem("focustrack:find:v1")).toContain('"q":""');
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     await waitFor(() =>
       expect(fetchMock.mock.calls.length).toBe(callsBefore + 1),
@@ -397,15 +400,21 @@ describe("FindSearch", () => {
     fireEvent.change(screen.getByLabelText(/Search sessions/), {
       target: { value: "platform" },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() =>
+      expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain("q=platform"),
+    );
     fireEvent.change(screen.getByLabelText(/Day/), {
       target: { value: "2026-11-12" },
     });
     fireEvent.click(screen.getByRole("checkbox", { name: /restricted/i }));
     await waitFor(
-      () =>
-        expect(
-          window.sessionStorage.getItem("focustrack:find:v1"),
-        ).toContain("2026-11-12"),
+      () => {
+        const stored = window.sessionStorage.getItem("focustrack:find:v1");
+        expect(stored).toContain('"q":"platform"');
+        expect(stored).toContain("2026-11-12");
+        expect(stored).toContain('"excludeRestricted":true');
+      },
       { timeout: 2000 },
     );
     first.unmount();
@@ -443,6 +452,49 @@ describe("FindSearch", () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("day=2026-11-10");
   });
 
+  it("restores stored search state after hydration without a mismatch", async () => {
+    const fetchMock = mockSearch({
+      results: [makeSession()],
+      mode: "hybrid",
+      tookMs: 1,
+    });
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(<FindSearch />);
+    document.body.append(container);
+    window.sessionStorage.setItem(
+      "focustrack:find:v1",
+      JSON.stringify({
+        q: "platform",
+        day: "2026-11-12",
+        excludeRestricted: true,
+      }),
+    );
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    let root: ReturnType<typeof hydrateRoot> | null = null;
+
+    try {
+      await act(async () => {
+        root = hydrateRoot(container, <FindSearch />);
+      });
+      expect(consoleError.mock.calls.flat().join(" ")).not.toMatch(
+        /hydration|did not match|server html/i,
+      );
+      expect(screen.getByLabelText(/Search sessions/)).toHaveValue("platform");
+      expect(screen.getByLabelText(/Day/)).toHaveValue("2026-11-12");
+      expect(screen.getByRole("checkbox", { name: /restricted/i })).toBeChecked();
+      await waitFor(() =>
+        expect(String(fetchMock.mock.calls[0]?.[0])).toContain("q=platform"),
+      );
+    } finally {
+      await act(async () => {
+        root?.unmount();
+      });
+      container.remove();
+    }
+  });
+
   it("shows Showing N of M and reveals 30 more without refetching", async () => {
     const many = Array.from({ length: 45 }, (_, i) =>
       makeSession({ id: `s${i}`, title: `Paginated Session ${i}` }),
@@ -453,7 +505,11 @@ describe("FindSearch", () => {
       tookMs: 1,
     });
     render(<FindSearch />);
-    expect(await screen.findByText("Showing 30 sessions")).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Showing 30 sessions/, {
+        selector: "p.results-meta",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole("status")[0]).toHaveTextContent(
       /Showing 30 sessions/,
     );
@@ -462,7 +518,11 @@ describe("FindSearch", () => {
     ).not.toBeInTheDocument();
     const callsBefore = fetchMock.mock.calls.length;
     fireEvent.click(screen.getByRole("button", { name: "Show 30 more" }));
-    expect(await screen.findByText("Showing 45 sessions")).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Showing 45 sessions/, {
+        selector: "p.results-meta",
+      }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Paginated Session 44" }),
     ).toBeInTheDocument();
@@ -528,12 +588,16 @@ describe("FindSearch", () => {
     );
     mockSearch({ results: many, mode: "lexical-fallback", tookMs: 1 });
     render(<FindSearch />);
-    expect(await screen.findByText("Showing 30 sessions")).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Showing 30 sessions/, {
+        selector: "p.results-meta",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole("status")[0]).toHaveTextContent(
       "Showing 30 sessions. Showing the first 30 — narrow your search to see others.",
     );
     expect(
-      screen.getByText(/Showing the first 30 — narrow your search/, {
+      screen.getByText("Showing the first 30 — narrow your search to see others.", {
         selector: "p.results-meta",
       }),
     ).toBeInTheDocument();
