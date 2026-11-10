@@ -524,7 +524,9 @@ export default function PlanView() {
                       <p className="card-place">{planBreak.room}</p>
                       <p className="break-note">
                         Time to rest in the quiet room.
-                        {!conflicts ? " No session is scheduled here." : null}
+                        {canIntervene && missingIds.length === 0 && !conflicts
+                          ? " No session is scheduled here."
+                          : null}
                       </p>
                       <div className="card-actions">
                         <button
