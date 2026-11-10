@@ -221,6 +221,11 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
     };
   }, []);
 
+  function browseInstead(): void {
+    flushDraft();
+    setNowOptOut();
+  }
+
   function openNotes() {
     if (!current) return;
     flushDraft();
@@ -351,10 +356,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
             </p>
           ) : null}
           <p className="now-browse-row">
-            <a className="now-button" href={findHref} onClick={() => {
-              flushDraft();
-              setNowOptOut();
-            }}>
+            <a className="now-button" href={findHref} onClick={browseInstead}>
               Browse talks instead
             </a>
           </p>
@@ -618,7 +620,7 @@ export default function NowScreen({ nowParam }: NowScreenProps) {
         </section>
 
         <nav className="now-nav" aria-label="Other pages">
-          <a className="now-button" href={findHref}>
+          <a className="now-button" href={findHref} onClick={browseInstead}>
             Find sessions
           </a>
         </nav>

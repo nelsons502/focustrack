@@ -408,6 +408,15 @@ describe("NowScreen", () => {
     fireEvent.click(link);
     expect(window.sessionStorage.getItem("focustrack:now-opt-out")).toBe("1");
   });
+
+  it("sets the session opt-out from the bottom Find sessions link", async () => {
+    seedPlan(["cur"]);
+    mockSessions([current]);
+    render(<NowScreen nowParam={DEMO} />);
+    const link = await screen.findByRole("link", { name: "Find sessions" });
+    fireEvent.click(link);
+    expect(window.sessionStorage.getItem("focustrack:now-opt-out")).toBe("1");
+  });
 });
 
 it.each(["Done", "Escape"])("returns focus to the main content after a talk ends and Notes closes with %s", async (action) => {

@@ -1,5 +1,6 @@
 import { resumeSim, startSim, stopSim } from "../client/clock";
 import { getLocalStateSnapshot, updateLocalState } from "../client/local-state";
+import { clearReflectDismissed } from "../../components/now/now-helpers";
 import {
   NOW_OPT_OUT_KEY,
   QUIET_ROOM_260A,
@@ -69,6 +70,7 @@ export function startMayaDemo(): void {
   updateLocalState(applyMayaPlan(getLocalStateSnapshot()));
   try {
     window.sessionStorage.removeItem(NOW_OPT_OUT_KEY);
+    MAYA_SESSION_IDS.forEach(clearReflectDismissed);
   } catch {
     // Storage may be unavailable; the demo still starts.
   }
