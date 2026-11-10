@@ -164,7 +164,7 @@ describe("SessionCard interactions", () => {
     ).toBeInTheDocument();
   });
 
-  it("reads Add to plan or In your plan while reflecting plan state with aria-pressed", () => {
+  it("keeps Add to plan as its accessible name while reflecting plan state with aria-pressed", () => {
     const { rerender } = renderCard(makeSession(), false);
     expect(
       screen.getByRole("button", {
@@ -176,9 +176,10 @@ describe("SessionCard interactions", () => {
     );
     expect(
       screen.getByRole("button", {
-        name: "In your plan: Kubernetes Basics Test Session",
+        name: "Add to plan: Kubernetes Basics Test Session",
       }),
     ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("✓ In your plan")).toBeVisible();
   });
 
   it("puts title, time and room first, with smaller speakers and estimates as chips", () => {
