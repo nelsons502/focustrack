@@ -75,14 +75,11 @@ function getLocationSearchServerSnapshot(): string {
 }
 
 export default function FindSearch() {
-  const [initialState] = useState(
-    () =>
-      readStoredFindState(ALLOWED_DAYS) ?? {
-        q: "",
-        day: DEFAULT_DAY,
-        excludeRestricted: false,
-      },
-  );
+  const [initialState] = useState(() => ({
+    q: "",
+    day: DEFAULT_DAY,
+    excludeRestricted: false,
+  }));
   const [query, setQuery] = useState(initialState.q);
   const [day, setDay] = useState(initialState.day);
   const [excludeRestricted, setExcludeRestricted] = useState(
@@ -128,6 +125,11 @@ export default function FindSearch() {
 
   const runSearch = useCallback(async (request: SearchRequest) => {
     lastRequestRef.current = request;
+    writeStoredFindState({
+      q: request.q,
+      day: request.day,
+      excludeRestricted: request.excludeRestricted,
+    });
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -156,6 +158,22 @@ export default function FindSearch() {
     }
   }, []);
 
+  // Restore before the initial search, which also persists its request.
+  useEffect(() => {
+    const storedState = readStoredFindState(ALLOWED_DAYS);
+    if (!storedState) return;
+    queueMicrotask(() => {
+      setQuery(storedState.q);
+      setDay(storedState.day);
+      setExcludeRestricted(storedState.excludeRestricted);
+    });
+    lastRequestRef.current = {
+      q: storedState.q.trim().slice(0, 300),
+      day: storedState.day,
+      excludeRestricted: storedState.excludeRestricted,
+    };
+  }, []);
+
   useEffect(() => {
     void runSearch(lastRequestRef.current);
     return () => {
@@ -166,10 +184,6 @@ export default function FindSearch() {
       }
     };
   }, [runSearch]);
-
-  useEffect(() => {
-    writeStoredFindState({ q: query, day, excludeRestricted });
-  }, [query, day, excludeRestricted]);
 
   const cancelPendingFilterSearch = useCallback(() => {
     if (filterTimerRef.current !== null) {
@@ -363,6 +377,9 @@ export default function FindSearch() {
         <>
           <p className="results-meta">
             {showingText(visibleResults.length, results.length)}
+            {results.length >= FIND_RESULT_LIMIT
+              ? " — there may be more; narrow your search or change the day to see others."
+              : null}
           </p>
           <ul className="results" ref={resultsListRef}>
             {visibleResults.map((session) => (
