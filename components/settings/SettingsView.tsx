@@ -121,6 +121,16 @@ export default function SettingsView() {
     setStatus("Theme saved on this device.");
   }
 
+  function handleResetAppearance() {
+    storeThemeChoice("system");
+    setStatus("Appearance reset to System (match this device).");
+  }
+
+  function handleResetDemo() {
+    stopSim();
+    setStatus("Demo clock reset. Your saved plan was not changed.");
+  }
+
   function closeConfirm() {
     restoreFocusRef.current = true;
     setConfirmingClear(false);
@@ -148,8 +158,13 @@ export default function SettingsView() {
       <p className="save-note" role="status" aria-live="polite">{status}</p>
 
       <section aria-labelledby="settings-energy-heading" className="settings-card">
-        <h2 id="settings-energy-heading">Energy check</h2>
-        <p>These limits shape the gentle energy check on your plan. They apply straight away and are stored on this device.</p>
+        <div className="settings-card-head">
+          <span className="settings-icon" aria-hidden="true">{"⚡︎"}</span>
+          <div className="settings-card-head-text">
+            <h2 id="settings-energy-heading">Energy check</h2>
+            <p className="settings-lede">These limits shape the gentle energy check on your plan. They apply straight away and are stored on this device.</p>
+          </div>
+        </div>
         <fieldset className="settings-fields settings-local-fields">
           <legend>Your limits for the energy check</legend>
           {NUMERIC_FIELDS.map((field) => {
@@ -182,18 +197,31 @@ export default function SettingsView() {
               id="settings-energy-flagLoudRooms"
               type="checkbox"
               checked={settings.flagLoudRooms}
+              aria-describedby="settings-energy-flagLoudRooms-hint"
               onChange={(event) => saveSettings({ ...settings, flagLoudRooms: event.target.checked })}
             />
             <label htmlFor="settings-energy-flagLoudRooms">Flag rooms estimated to be loud</label>
           </div>
+          <p id="settings-energy-flagLoudRooms-hint" className="field-hint">
+            When on, we gently flag sessions in rooms estimated to be loud.
+          </p>
         </fieldset>
-        <button type="button" className="button" onClick={handleReset}>
-          Reset energy settings to defaults
-        </button>
+        <div className="settings-card-foot">
+          <button type="button" className="button" onClick={handleReset}>
+            Reset energy settings to defaults
+          </button>
+          <p className="field-hint">Reset restores the gentle defaults for every limit above.</p>
+        </div>
       </section>
 
       <section aria-labelledby="settings-theme-heading" className="settings-card">
-        <h2 id="settings-theme-heading">Theme</h2>
+        <div className="settings-card-head">
+          <span className="settings-icon" aria-hidden="true">{"◐"}</span>
+          <div className="settings-card-head-text">
+            <h2 id="settings-theme-heading">Appearance</h2>
+            <p className="settings-lede">Choose System to match this device, or pick Light or Dark. Saved on this device and applied straight away.</p>
+          </div>
+        </div>
         <fieldset className="theme-fields">
           <legend>Choose how FocusTrack looks on this device</legend>
           {THEME_OPTIONS.map((option) => (
@@ -209,18 +237,41 @@ export default function SettingsView() {
             </label>
           ))}
         </fieldset>
+        <div className="settings-card-foot">
+          <button type="button" className="button" onClick={handleResetAppearance}>
+            Reset appearance to System
+          </button>
+          <p className="field-hint">Reset follows your device again.</p>
+        </div>
       </section>
 
       <section aria-labelledby="settings-demo-heading" className="settings-card">
-        <h2 id="settings-demo-heading">Demo</h2>
-        <p>See a conference day unfold at 60× speed. Starting the demo replaces your saved plan; notes and reflections stay on this device.</p>
-        <Link href={withNowParam("/demo", rawNow)} className="button settings-demo-link">
-          Play my day
-        </Link>
+        <div className="settings-card-head">
+          <span className="settings-icon" aria-hidden="true">{"▶︎"}</span>
+          <div className="settings-card-head-text">
+            <h2 id="settings-demo-heading">Demo</h2>
+            <p className="settings-lede">See a conference day unfold at 60× speed. Starting the demo replaces your saved plan; notes and reflections stay on this device.</p>
+          </div>
+        </div>
+        <div className="settings-actions">
+          <Link href={withNowParam("/demo", rawNow)} className="button settings-demo-link">
+            Play my day
+          </Link>
+          <button type="button" className="button" onClick={handleResetDemo}>
+            Reset demo clock
+          </button>
+        </div>
+        <p className="field-hint">Reset stops the demo clock on this device. It does not change your saved plan.</p>
       </section>
 
       <section aria-labelledby="settings-privacy-heading" className="settings-card">
-        <h2 id="settings-privacy-heading">Your data on this device</h2>
+        <div className="settings-card-head">
+          <span className="settings-icon" aria-hidden="true">{"⚿"}</span>
+          <div className="settings-card-head-text">
+            <h2 id="settings-privacy-heading">Your data &amp; privacy</h2>
+            <p className="settings-lede">Everything below stays on this device. Clearing it is the reset for this group.</p>
+          </div>
+        </div>
         <p>
           Your plan, notes, breaks, reflections and energy settings stay on this device.
           They are not sent to a server. This page uses system fonts and does not request
