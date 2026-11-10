@@ -16,6 +16,44 @@ describe("DemoBar", () => {
   it("renders nothing when no sim is active", () => {
     const { container } = render(<DemoBar />);
     expect(container.querySelector(".demo-bar")).toBeNull();
+    expect(container.querySelector(".demo-bar-spacer")).toBeNull();
+  });
+
+  it("renders a spacer so the fixed pill never covers page content", () => {
+    startSim("2026-11-10T11:10:00-07:00", 60);
+    const { container } = render(<DemoBar />);
+    expect(container.querySelector(".demo-bar-spacer")).not.toBeNull();
+    expect(container.querySelector(".demo-bar")).not.toBeNull();
+  });
+
+  it("reserves the measured bar height plus its bottom offset", () => {
+    const rect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({
+        height: 120,
+        width: 300,
+        top: window.innerHeight - 132,
+        bottom: window.innerHeight - 12,
+        left: 0,
+        right: 300,
+        x: 0,
+        y: window.innerHeight - 132,
+        toJSON: () => ({}),
+      } as DOMRect);
+    try {
+      startSim("2026-11-10T11:10:00-07:00", 60);
+      const { unmount } = render(<DemoBar />);
+      expect(
+        document.documentElement.style.getPropertyValue("--demo-bar-space"),
+      ).toBe("132px");
+      unmount();
+      expect(
+        document.documentElement.style.getPropertyValue("--demo-bar-space"),
+      ).toBe("");
+    } finally {
+      rect.mockRestore();
+      document.documentElement.style.removeProperty("--demo-bar-space");
+    }
   });
 
   it("shows the simulated event time labelled as Demo time", () => {
