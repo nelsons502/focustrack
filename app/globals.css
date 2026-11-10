@@ -565,7 +565,7 @@ textarea:focus-visible,
   position: absolute;
   left: 0.5rem;
   top: -4rem;
-  z-index: 10;
+  z-index: 120;
   display: inline-flex;
   align-items: center;
   min-height: 44px;
