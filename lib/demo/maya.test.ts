@@ -139,6 +139,18 @@ describe("startMayaDemo", () => {
     expect(window.sessionStorage.getItem("unrelated")).toBe("keep");
   });
 
+  it("clears reflection dismissals for Maya's sessions only", () => {
+    MAYA_SESSION_IDS.forEach((id) => window.sessionStorage.setItem(`focustrack:reflect-dismissed:${id}`, "1"));
+    window.sessionStorage.setItem("focustrack:reflect-dismissed:other", "1");
+
+    startMayaDemo();
+
+    MAYA_SESSION_IDS.forEach((id) =>
+      expect(window.sessionStorage.getItem(`focustrack:reflect-dismissed:${id}`)).toBeNull(),
+    );
+    expect(window.sessionStorage.getItem("focustrack:reflect-dismissed:other")).toBe("1");
+  });
+
   it("preserves in-memory notes, settings and reflections when persisting them failed", () => {
     const seeded = seededState();
     const setItem = vi

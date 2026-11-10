@@ -40,6 +40,14 @@ export function dismissReflect(sessionId: string): void {
   writeSessionFlag(reflectDismissKey(sessionId));
 }
 
+export function clearReflectDismissed(sessionId: string): void {
+  try {
+    if (typeof window !== "undefined") window.sessionStorage.removeItem(reflectDismissKey(sessionId));
+  } catch {
+    // Session flags are a convenience; losing one must never break the screen.
+  }
+}
+
 function time(value: string): number {
   return new Date(value).getTime();
 }
