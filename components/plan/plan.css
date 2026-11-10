@@ -35,15 +35,64 @@
   color: var(--muted);
 }
 
+.plan-page,
+.plan {
+  font-family: "Nunito Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.plan {
+  display: grid;
+  gap: 0.25rem;
+}
+
 .plan-heading {
   margin: 1.5rem 0 0.35rem;
   font-size: 1.35rem;
   line-height: 1.25;
+  letter-spacing: -0.01em;
 }
 
 .plan-intro {
   margin: 0 0 1rem;
   color: var(--muted);
+  max-width: 36rem;
+}
+
+.plan-settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+}
+
+.plan-settings-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.5rem 1rem;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--link);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.plan-settings-link:hover {
+  background: var(--accent-soft);
+}
+
+.plan-now-line {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-weight: 600;
 }
 
 .plan-day-field {
@@ -56,7 +105,7 @@
   min-height: 44px;
   padding: 0.5rem 0.65rem;
   border: 1.5px solid var(--muted);
-  border-radius: 6px;
+  border-radius: 10px;
   background: var(--surface);
   color: var(--fg);
   font: inherit;
@@ -66,9 +115,51 @@
 .timeline {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0 0 1.25rem;
   display: grid;
-  gap: 0.85rem;
+  gap: 1rem;
+  position: relative;
+}
+
+.timeline::before {
+  content: "";
+  position: absolute;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  left: 0.3rem;
+  width: 2px;
+  background: var(--border);
+  border-radius: 999px;
+  opacity: 0.55;
+}
+
+.timeline-item {
+  position: relative;
+}
+
+.timeline-item::before {
+  content: "";
+  position: absolute;
+  top: 1.4rem;
+  left: -1.18rem;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+}
+
+.timeline-item-break::before {
+  background: var(--accent-soft);
+}
+
+.timeline-item-current::before {
+  background: var(--coral);
+  border-color: var(--coral);
+}
+
+.timeline-item-past::before {
+  opacity: 0.82;
 }
 
 .timeline-gap {
@@ -77,12 +168,68 @@
   font-size: 0.95rem;
 }
 
+.timeline-phase {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  margin: 0 0 0.5rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.timeline-item-current .timeline-phase {
+  background: var(--coral);
+  color: var(--on-coral);
+}
+
+.timeline-card,
+.card-break {
+  border-radius: 16px;
+}
+
 .card-break {
   background: var(--accent-soft);
+  border-style: dashed;
+}
+
+.break-eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--accent-dark);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.break-note {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
 }
 
 .break-undo {
   margin: 0 0 1rem;
+}
+
+.energy-card {
+  margin-top: 2rem;
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-soft);
+}
+
+.energy-card .plan-heading {
+  margin-top: 0;
+}
+
+.energy-eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--accent-dark);
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .warnings {
@@ -94,18 +241,25 @@
 }
 
 .warning {
-  padding: 0.75rem 1rem;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent);
-  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  line-height: 1.55;
 }
 
 .suggestion {
   margin: 0 0 1rem;
   padding: 1rem;
-  background: var(--surface);
+  background: var(--accent-soft);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 14px;
+}
+
+.suggestion-label {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+  color: var(--accent-dark);
 }
 
 .suggestion p {
@@ -120,7 +274,7 @@
   margin-top: 1rem;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
 .settings-summary {
@@ -186,6 +340,14 @@
   padding: 0.75rem 1rem;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .plan *,
+  .plan-page * {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

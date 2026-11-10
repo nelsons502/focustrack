@@ -10,6 +10,7 @@ import {
   createDefaultLocalState,
   updateLocalState,
 } from "../../lib/client/local-state";
+import { startSim, stopSim } from "../../lib/client/clock";
 import PlanView from "./PlanView";
 
 function makeSession(overrides: Partial<Session> = {}): Session {
@@ -98,6 +99,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  stopSim();
+  window.sessionStorage.clear();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -455,6 +458,9 @@ describe("PlanView", () => {
       screen.getByRole("heading", { name: "Quiet-room break" }),
     ).toBeInTheDocument();
     expect(screen.getByText(/overlaps a saved session/)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/No session is scheduled here/),
+    ).not.toBeInTheDocument();
     fireEvent.click(
       screen.getByRole("button", { name: /Remove quiet-room break/ }),
     );
@@ -716,4 +722,130 @@ describe("PlanView", () => {
       screen.getByText(/No energy concerns for this day/),
     ).toBeInTheDocument();
   });
+
+  it("links to Settings and shows quiet-room breaks as rest blocks", async () => {
+    savePlan(["a", "b"], {}, [gapBreak]);
+    mockSessions([
+      makeSession({ id: "a", title: "Expo Talk" }),
+      makeSession({
+        id: "b",
+        title: "Later Talk",
+        startsAt: "2026-11-10T17:00:00Z",
+        endsAt: "2026-11-10T17:30:00Z",
+      }),
+    ]);
+    await renderAndLoadPlan();
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute(
+      "href",
+      "/settings",
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Quiet-room break" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Rest break")).toBeInTheDocument();
+    expect(screen.getByText(/Time to rest in the quiet room/)).toBeInTheDocument();
+    expect(screen.getByText(QUIET_ROOM_260A)).toBeInTheDocument();
+  });
+
+  it("marks the session happening now using the shared clock", async () => {
+    savePlan(["a", "b"]);
+    mockSessions([
+      makeSession({ id: "a", title: "Expo Talk" }),
+      makeSession({
+        id: "b",
+        title: "Later Talk",
+        startsAt: "2026-11-10T17:00:00Z",
+        endsAt: "2026-11-10T17:30:00Z",
+      }),
+    ]);
+    startSim("2026-11-10T16:15:00Z", 1);
+    await renderAndLoadPlan();
+    expect(
+      await screen.findByRole("heading", { name: "Expo Talk" }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("Happening now")).toBeInTheDocument();
+    expect(screen.getByText("Up next")).toBeInTheDocument();
+    expect(screen.getByText(/It is currently/)).toBeInTheDocument();
+    expect(screen.getByText(/It is currently/)).not.toHaveAttribute(
+      "role",
+      "status",
+    );
+  });
+
+  it("waits for current session data before claiming a break has no overlap", async () => {
+    savePlan(
+      ["a"],
+      {},
+      [
+        {
+          ...gapBreak,
+          startsAt: "2026-11-10T16:10:00.000Z",
+          endsAt: "2026-11-10T16:40:00.000Z",
+        },
+      ],
+    );
+    let resolveFetch: (value: Response) => void = () => undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveFetch = resolve;
+          }),
+      ),
+    );
+    await renderAndLoadPlan();
+    expect(
+      screen.getByRole("heading", { name: "Quiet-room break" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/No session is scheduled here/),
+    ).not.toBeInTheDocument();
+
+    act(() => {
+      resolveFetch(jsonResponse([makeSession({ id: "a" })]));
+    });
+    expect(
+      await screen.findByText(/overlaps a saved session/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/No session is scheduled here/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the no-session note only for a break that does not overlap", async () => {
+    savePlan(["a", "b"], {}, [gapBreak]);
+    mockSessions([
+      makeSession({ id: "a", title: "Expo Talk" }),
+      makeSession({
+        id: "b",
+        title: "Later Talk",
+        startsAt: "2026-11-10T17:00:00Z",
+        endsAt: "2026-11-10T17:30:00Z",
+      }),
+    ]);
+    await renderAndLoadPlan();
+    expect(
+      await screen.findByRole("heading", { name: "Quiet-room break" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/No session is scheduled here/),
+    ).toBeInTheDocument();
+  });
+});
+
+it("does not assert a free break before saved session lookups resolve", () => {
+  savePlan(["s1"], {}, [gapBreak]);
+  vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => undefined)));
+  render(<PlanView />);
+  expect(screen.getByRole("heading", { name: "Quiet-room break" })).toBeInTheDocument();
+  expect(screen.queryByText(/No session is scheduled here/)).not.toBeInTheDocument();
+});
+
+it("does not assert a free break if saved sessions were not found", async () => {
+  savePlan(["s1"], {}, [gapBreak]);
+  mockSessions([]);
+  render(<PlanView />);
+  await screen.findByRole("heading", { name: "Saved sessions we could not find" });
+  expect(screen.queryByText(/No session is scheduled here/)).not.toBeInTheDocument();
 });
