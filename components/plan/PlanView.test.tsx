@@ -772,6 +772,47 @@ describe("PlanView", () => {
     );
   });
 
+  it("waits for current session data before claiming a break has no overlap", async () => {
+    savePlan(
+      ["a"],
+      {},
+      [
+        {
+          ...gapBreak,
+          startsAt: "2026-11-10T16:10:00.000Z",
+          endsAt: "2026-11-10T16:40:00.000Z",
+        },
+      ],
+    );
+    let resolveFetch: (value: Response) => void = () => undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveFetch = resolve;
+          }),
+      ),
+    );
+    await renderAndLoadPlan();
+    expect(
+      screen.getByRole("heading", { name: "Quiet-room break" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/No session is scheduled here/),
+    ).not.toBeInTheDocument();
+
+    act(() => {
+      resolveFetch(jsonResponse([makeSession({ id: "a" })]));
+    });
+    expect(
+      await screen.findByText(/overlaps a saved session/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/No session is scheduled here/),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows the no-session note only for a break that does not overlap", async () => {
     savePlan(["a", "b"], {}, [gapBreak]);
     mockSessions([
