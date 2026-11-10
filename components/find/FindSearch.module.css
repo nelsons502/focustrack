@@ -1,0 +1,38 @@
+.resultItem:focus {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.showMore {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.25rem;
+}
+
+.showMoreButton {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.55rem 1.1rem;
+  border: 1.5px solid var(--accent-dark);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--accent-dark);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.showMoreButton:hover {
+  background: var(--accent-soft);
+}
+
+.showMoreButton:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .showMoreButton {
+    transition: none;
+  }
+}

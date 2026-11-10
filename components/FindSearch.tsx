@@ -22,9 +22,16 @@ import { fetchSearch, type SearchRequest } from "../lib/client/search-api";
 import { formatEventInstant, parseDemoNow } from "../lib/client/time";
 import { DEMO_DAY } from "../lib/event";
 import SessionCard from "./SessionCard";
+import {
+  FIND_FILTER_DEBOUNCE_MS,
+  FIND_PAGE_SIZE,
+  FIND_RESULT_LIMIT,
+  readStoredFindState,
+  writeStoredFindState,
+} from "./find/find-state";
+import styles from "./find/FindSearch.module.css";
 
 const DEFAULT_DAY = DEMO_DAY;
-const RESULT_LIMIT = 30;
 
 const DAY_OPTIONS: { value: string; label: string }[] = [
   { value: "2026-11-09", label: "Mon, Nov 9" },
@@ -43,10 +50,17 @@ function modeLabel(submittedQuery: string, mode: SearchMode | null): string {
   return "Search results";
 }
 
-function resultCountText(count: number): string {
-  if (count === 1) return "1 session shown.";
-  return `${count} sessions shown.`;
+function showingText(visible: number, total: number): string {
+  if (total >= FIND_RESULT_LIMIT) {
+    return `Showing ${visible} ${visible === 1 ? "session" : "sessions"}`;
+  }
+  const noun = total === 1 ? "session" : "sessions";
+  return `Showing ${visible} of ${total} ${noun}`;
 }
+
+const ALLOWED_DAYS: readonly string[] = DAY_OPTIONS.map(
+  (option) => option.value,
+);
 
 function subscribeLocationSearch(): () => void {
   return () => undefined;
@@ -61,14 +75,22 @@ function getLocationSearchServerSnapshot(): string {
 }
 
 export default function FindSearch() {
-  const [query, setQuery] = useState("");
-  const [day, setDay] = useState(DEFAULT_DAY);
-  const [excludeRestricted, setExcludeRestricted] = useState(false);
+  const [initialState] = useState(() => ({
+    q: "",
+    day: DEFAULT_DAY,
+    excludeRestricted: false,
+  }));
+  const [query, setQuery] = useState(initialState.q);
+  const [day, setDay] = useState(initialState.day);
+  const [excludeRestricted, setExcludeRestricted] = useState(
+    initialState.excludeRestricted,
+  );
   const [status, setStatus] = useState<SearchStatus>("loading");
   const [results, setResults] = useState<Session[]>([]);
   const [mode, setMode] = useState<SearchMode | null>(null);
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [visibleCount, setVisibleCount] = useState(FIND_PAGE_SIZE);
   const localState = useSyncExternalStore(
     subscribeLocalState,
     getLocalStateSnapshot,
@@ -90,20 +112,29 @@ export default function FindSearch() {
     const rest = params.toString();
     return rest ? `/?${rest}` : "/";
   }, [locationSearch]);
+  const resultsListRef = useRef<HTMLUListElement | null>(null);
+  const pendingFocusIndexRef = useRef<number | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
+  const filterTimerRef = useRef<number | null>(null);
   const requestSeqRef = useRef(0);
   const lastRequestRef = useRef<SearchRequest>({
-    q: "",
-    day: DEFAULT_DAY,
-    excludeRestricted: false,
+    q: initialState.q.trim().slice(0, 300),
+    day: initialState.day,
+    excludeRestricted: initialState.excludeRestricted,
   });
 
   const runSearch = useCallback(async (request: SearchRequest) => {
     lastRequestRef.current = request;
+    writeStoredFindState({
+      q: request.q,
+      day: request.day,
+      excludeRestricted: request.excludeRestricted,
+    });
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
     const seq = ++requestSeqRef.current;
+    setVisibleCount(FIND_PAGE_SIZE);
     setStatus("loading");
     setErrorMessage("");
     setSubmittedQuery(request.q.trim());
@@ -127,18 +158,86 @@ export default function FindSearch() {
     }
   }, []);
 
+  // Restore before the initial search, which also persists its request.
+  useEffect(() => {
+    const storedState = readStoredFindState(ALLOWED_DAYS);
+    if (!storedState) return;
+    queueMicrotask(() => {
+      setQuery(storedState.q);
+      setDay(storedState.day);
+      setExcludeRestricted(storedState.excludeRestricted);
+    });
+    lastRequestRef.current = {
+      q: storedState.q.trim().slice(0, 300),
+      day: storedState.day,
+      excludeRestricted: storedState.excludeRestricted,
+    };
+  }, []);
+
   useEffect(() => {
     void runSearch(lastRequestRef.current);
-    return () => controllerRef.current?.abort();
+    return () => {
+      controllerRef.current?.abort();
+      if (filterTimerRef.current !== null) {
+        window.clearTimeout(filterTimerRef.current);
+        filterTimerRef.current = null;
+      }
+    };
   }, [runSearch]);
+
+  const cancelPendingFilterSearch = useCallback(() => {
+    if (filterTimerRef.current !== null) {
+      window.clearTimeout(filterTimerRef.current);
+      filterTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleFilterSearch = useCallback(
+    (next: { day: string; excludeRestricted: boolean }) => {
+      cancelPendingFilterSearch();
+      filterTimerRef.current = window.setTimeout(() => {
+        filterTimerRef.current = null;
+        void runSearch({
+          q: lastRequestRef.current.q,
+          day: next.day,
+          excludeRestricted: next.excludeRestricted,
+        });
+      }, FIND_FILTER_DEBOUNCE_MS);
+    },
+    [cancelPendingFilterSearch, runSearch],
+  );
+
+  function handleDayChange(value: string) {
+    setDay(value);
+    scheduleFilterSearch({ day: value, excludeRestricted });
+  }
+
+  function handleExcludeRestrictedChange(checked: boolean) {
+    setExcludeRestricted(checked);
+    scheduleFilterSearch({ day, excludeRestricted: checked });
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    cancelPendingFilterSearch();
     void runSearch({
       q: query.trim().slice(0, 300),
       day,
       excludeRestricted,
     });
+  }
+
+  useEffect(() => {
+    const firstNewIndex = pendingFocusIndexRef.current;
+    if (firstNewIndex === null) return;
+    pendingFocusIndexRef.current = null;
+    const item = resultsListRef.current?.children[firstNewIndex];
+    if (item instanceof HTMLElement) item.focus();
+  }, [visibleCount]);
+
+  function handleShowMore() {
+    pendingFocusIndexRef.current = visibleCount;
+    setVisibleCount((count) => count + FIND_PAGE_SIZE);
   }
 
   function handleRetry() {
@@ -167,12 +266,17 @@ export default function FindSearch() {
   }
 
   const planIds = new Set(localState.plan.sessionIds);
+  const visibleResults = results.slice(0, visibleCount);
+  const capHint =
+    results.length >= FIND_RESULT_LIMIT
+      ? ` Showing the first ${FIND_RESULT_LIMIT} — narrow your search to see others.`
+      : "";
   const statusText =
     status === "loading"
       ? "Searching…"
       : status === "error"
         ? "Search could not be completed."
-        : `${modeLabel(submittedQuery, mode)}. ${resultCountText(results.length)}`;
+        : `${modeLabel(submittedQuery, mode)}. ${showingText(visibleResults.length, results.length)}.${capHint}`;
 
   return (
     <section aria-labelledby="find-heading" className="find">
@@ -212,7 +316,7 @@ export default function FindSearch() {
             id="search-day"
             name="day"
             value={day}
-            onChange={(event) => setDay(event.target.value)}
+            onChange={(event) => handleDayChange(event.target.value)}
           >
             {DAY_OPTIONS.map((option) => (
               <option key={option.label} value={option.value}>
@@ -227,7 +331,9 @@ export default function FindSearch() {
             name="excludeRestricted"
             type="checkbox"
             checked={excludeRestricted}
-            onChange={(event) => setExcludeRestricted(event.target.checked)}
+            onChange={(event) =>
+              handleExcludeRestrictedChange(event.target.checked)
+            }
           />
           <label htmlFor="search-exclude">
             Hide restricted sessions (sold out, separate registration or
@@ -273,14 +379,21 @@ export default function FindSearch() {
 
       {status === "success" && results.length > 0 ? (
         <>
-          {results.length >= RESULT_LIMIT ? (
+          <p className="results-meta">
+            {showingText(visibleResults.length, results.length)}
+            {results.length > FIND_RESULT_LIMIT
+              ? " — there may be more; narrow your search or change the day to see others."
+              : null}
+          </p>
+          {results.length >= FIND_RESULT_LIMIT ? (
             <p className="results-meta">
-              Showing the first 30 — narrow your search to see others.
+              Showing the first {FIND_RESULT_LIMIT} — narrow your search to see
+              others.
             </p>
           ) : null}
-          <ul className="results">
-            {results.map((session) => (
-              <li key={session.id}>
+          <ul className="results" ref={resultsListRef}>
+            {visibleResults.map((session) => (
+              <li key={session.id} tabIndex={-1} className={styles.resultItem}>
                 <SessionCard
                   session={session}
                   inPlan={planIds.has(session.id)}
@@ -289,12 +402,23 @@ export default function FindSearch() {
               </li>
             ))}
           </ul>
+          {visibleResults.length < results.length ? (
+            <div className={styles.showMore}>
+              <button
+                type="button"
+                className={styles.showMoreButton}
+                onClick={handleShowMore}
+              >
+                Show 30 more
+              </button>
+            </div>
+          ) : null}
         </>
       ) : null}
 
       <p className="plan-note">
-        Your plan is saved on this device only. Nothing about your plan is
-        sent to a server.
+        Your notes, breaks, settings and reflections stay on this device.
+        Saved session IDs are used to look up times and rooms.
         {localState.plan.sessionIds.length > 0
           ? ` ${localState.plan.sessionIds.length} session${localState.plan.sessionIds.length === 1 ? "" : "s"} in your plan so far.`
           : ""}
