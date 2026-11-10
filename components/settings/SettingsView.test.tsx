@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_ENERGY_SETTINGS, LOCAL_STATE_KEY, type LocalState } from "../../lib/contract";
 import { createDefaultLocalState, updateLocalState } from "../../lib/client/local-state";
+import { getSimClock, startSim } from "../../lib/client/clock";
 import SettingsView from "./SettingsView";
 
 function stored(): LocalState {
@@ -113,10 +114,11 @@ describe("SettingsView grouped cards", () => {
   it("resets the demo clock without changing the saved plan", async () => {
     const seeded = { ...createDefaultLocalState(), plan: { sessionIds: ["a"], notAttending: [], breaks: [] } };
     updateLocalState(seeded);
-    sessionStorage.setItem("focustrack:clock", JSON.stringify({ playing: true, speed: 60, simStartMs: Date.now(), realStartMs: Date.now() }));
+    startSim("2026-11-10T11:10:00-07:00", 60);
+    expect(getSimClock()).toMatchObject({ playing: true, speed: 60 });
     render(<SettingsView />);
     fireEvent.click(screen.getByRole("button", { name: /Reset demo clock/ }));
-    expect(sessionStorage.getItem("focustrack:clock")).toBeNull();
+    expect(getSimClock()).toBeNull();
     await waitFor(() => expect(stored().plan.sessionIds).toEqual(["a"]));
     expect(screen.getByRole("status")).toHaveTextContent("Demo clock reset");
   });
