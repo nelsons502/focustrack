@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_ENERGY_SETTINGS, LOCAL_STATE_KEY, type LocalState } from "../../lib/contract";
 import { createDefaultLocalState, updateLocalState } from "../../lib/client/local-state";
+import { getSimClock, startSim } from "../../lib/client/clock";
 import SettingsView from "./SettingsView";
 
 function stored(): LocalState {
@@ -87,6 +88,39 @@ describe("SettingsView clear data", () => {
     expect(screen.getByText(/Your plan, notes, breaks, reflections and energy settings stay on this device/)).toBeInTheDocument();
     expect(screen.getByText(/public session IDs/)).toBeInTheDocument();
     expect(screen.getByText(/does not request fonts from a third party/)).toBeInTheDocument();
+  });
+});
+
+describe("SettingsView grouped cards", () => {
+  it("shows the four calm groups with clear headings", () => {
+    render(<SettingsView />);
+    expect(screen.getByRole("heading", { name: /Energy check/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Appearance/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Demo/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Your data & privacy/ })).toBeInTheDocument();
+  });
+
+  it("resets appearance to System", () => {
+    render(<SettingsView />);
+    fireEvent.click(screen.getByRole("radio", { name: /Dark/ }));
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    fireEvent.click(screen.getByRole("button", { name: /Reset appearance to System/ }));
+    expect(localStorage.getItem("focustrack:theme")).toBe("system");
+    expect(document.documentElement.dataset.theme).toBeUndefined();
+    expect(screen.getByRole("radio", { name: /System/ })).toBeChecked();
+    expect(screen.getByRole("status")).toHaveTextContent("Appearance reset to System");
+  });
+
+  it("resets the demo clock without changing the saved plan", async () => {
+    const seeded = { ...createDefaultLocalState(), plan: { sessionIds: ["a"], notAttending: [], breaks: [] } };
+    updateLocalState(seeded);
+    startSim("2026-11-10T11:10:00-07:00", 60);
+    expect(getSimClock()).toMatchObject({ playing: true, speed: 60 });
+    render(<SettingsView />);
+    fireEvent.click(screen.getByRole("button", { name: /Reset demo clock/ }));
+    expect(getSimClock()).toBeNull();
+    await waitFor(() => expect(stored().plan.sessionIds).toEqual(["a"]));
+    expect(screen.getByRole("status")).toHaveTextContent("Demo clock reset");
   });
 });
 
