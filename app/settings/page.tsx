@@ -11,7 +11,7 @@ export default function SettingsPage() {
       <header className="masthead">
         <h1>Settings</h1>
         <p className="purpose">
-          Your energy limits, theme, and the data kept on this device.
+          Your energy limits, appearance, and the data kept on this device — grouped below so you can change one thing at a time.
         </p>
       </header>
       <SettingsView />

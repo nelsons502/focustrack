@@ -90,6 +90,38 @@ describe("SettingsView clear data", () => {
   });
 });
 
+describe("SettingsView grouped cards", () => {
+  it("shows the four calm groups with clear headings", () => {
+    render(<SettingsView />);
+    expect(screen.getByRole("heading", { name: /Energy check/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Appearance/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Demo/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Your data & privacy/ })).toBeInTheDocument();
+  });
+
+  it("resets appearance to System", () => {
+    render(<SettingsView />);
+    fireEvent.click(screen.getByRole("radio", { name: /Dark/ }));
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    fireEvent.click(screen.getByRole("button", { name: /Reset appearance to System/ }));
+    expect(localStorage.getItem("focustrack:theme")).toBe("system");
+    expect(document.documentElement.dataset.theme).toBeUndefined();
+    expect(screen.getByRole("radio", { name: /System/ })).toBeChecked();
+    expect(screen.getByRole("status")).toHaveTextContent("Appearance reset to System");
+  });
+
+  it("resets the demo clock without changing the saved plan", async () => {
+    const seeded = { ...createDefaultLocalState(), plan: { sessionIds: ["a"], notAttending: [], breaks: [] } };
+    updateLocalState(seeded);
+    sessionStorage.setItem("focustrack:clock", JSON.stringify({ playing: true, speed: 60, simStartMs: Date.now(), realStartMs: Date.now() }));
+    render(<SettingsView />);
+    fireEvent.click(screen.getByRole("button", { name: /Reset demo clock/ }));
+    expect(sessionStorage.getItem("focustrack:clock")).toBeNull();
+    await waitFor(() => expect(stored().plan.sessionIds).toEqual(["a"]));
+    expect(screen.getByRole("status")).toHaveTextContent("Demo clock reset");
+  });
+});
+
 describe("clear confirm focus", () => {
   it("moves focus into the confirm and back to the trigger on cancel", async () => {
     render(<SettingsView />);
