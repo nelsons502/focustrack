@@ -282,7 +282,7 @@ describe("FindSearch", () => {
     expect(saved.energy.flagLoudRooms).toBe(true);
     expect(
       screen.getByRole("button", {
-        name: "In your plan: Kubernetes Basics Test Session",
+        name: "Add to plan: Kubernetes Basics Test Session",
       }),
     ).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText(/added to your plan/)).toBeInTheDocument();
@@ -593,8 +593,13 @@ describe("FindSearch", () => {
         selector: "p.results-meta",
       }),
     ).toBeInTheDocument();
+    expect(screen.getAllByRole("status")[0]).toHaveTextContent(
+      "Showing 30 sessions. Showing the first 30 — narrow your search to see others.",
+    );
     expect(
-      screen.getByText("Showing the first 30 — narrow your search to see others."),
+      screen.getByText("Showing the first 30 — narrow your search to see others.", {
+        selector: "p.results-meta",
+      }),
     ).toBeInTheDocument();
     expect(
       screen.queryByText("Showing 30 of 30 sessions"),

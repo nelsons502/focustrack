@@ -164,8 +164,10 @@ export default function SessionCard({
           aria-pressed={inPlan}
           onClick={() => onTogglePlan(session)}
         >
-          {inPlan ? <span aria-hidden="true">✓ </span> : null}
-          {inPlan ? "In your plan" : "Add to plan"}
+          {inPlan ? <span aria-hidden="true">✓ In your plan</span> : null}
+          <span className={inPlan ? "visually-hidden" : undefined}>
+            Add to plan
+          </span>
           <span className="visually-hidden">: {session.title}</span>
         </button>
         {session.sourceUrl ? (
