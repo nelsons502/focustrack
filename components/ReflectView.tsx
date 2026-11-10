@@ -9,7 +9,7 @@ import {
   type FormEvent,
 } from "react";
 import type { LocalState, Session } from "../lib/contract";
-import { getNow, useNow } from "../lib/client/clock";
+import { getNow, getSimClock, useNow } from "../lib/client/clock";
 import {
   getLocalStateServerSnapshot,
   getLocalStateSnapshot,
@@ -24,7 +24,7 @@ import {
 } from "../lib/client/reflection";
 import { buildReflectionPrompts } from "../lib/client/reflection-prompts";
 import { fetchSessionsByIds } from "../lib/client/sessions-api";
-import { formatEventInstant, formatEventRange } from "../lib/client/time";
+import { formatEventInstant, formatEventRange, parseDemoNow } from "../lib/client/time";
 
 type View = { kind: "list" } | { kind: "session"; id: string } | { kind: "recap" };
 type LoadStatus = "loading" | "success" | "error";
@@ -63,6 +63,7 @@ export default function ReflectView() {
   // every second, so a talk appears here as soon as it ends in demo time.
   const now = useNow(1000);
   const clockReady = now.getTime() !== 0;
+  const isDemoTime = clockReady && (getSimClock() !== null || parseDemoNow(new URLSearchParams(locationSearch).get("now")) !== null);
   const homeHref = useMemo(() => {
     const param = new URLSearchParams(locationSearch).get("now");
     return param ? `/?now=${encodeURIComponent(param)}` : "/";
@@ -109,7 +110,7 @@ export default function ReflectView() {
 
   const nowLabel = clockReady ? (
     <p className="reflect-meta reflect-now">
-      Right now:{" "}
+      {isDemoTime ? "Demo time:" : "Right now:"}{" "}
       <time dateTime={now.toISOString()}>{formatEventInstant(now)}</time>
     </p>
   ) : null;

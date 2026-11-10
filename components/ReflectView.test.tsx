@@ -52,6 +52,13 @@ afterEach(() => {
 });
 
 describe("ReflectView", () => {
+  it("labels a pinned clock as demo time even without the simulation bar", async () => {
+    seed({ plan: { sessionIds: ["s1"], notAttending: [] } });
+    await renderFresh();
+    expect(await screen.findByText(/Demo time:/)).toBeInTheDocument();
+    expect(screen.queryByText(/Right now:/)).not.toBeInTheDocument();
+  });
+
   it("shows a calm empty state when nothing has ended", async () => {
     window.history.pushState({}, "", "/reflect?now=2026-11-10T08:00-07:00");
     seed({ plan: { sessionIds: ["s1"], notAttending: [] } });
