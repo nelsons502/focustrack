@@ -594,16 +594,14 @@ describe("FindSearch", () => {
       }),
     ).toBeInTheDocument();
     expect(
+      screen.getByText("Showing the first 30 — narrow your search to see others."),
+    ).toBeInTheDocument();
+    expect(
       screen.queryByText("Showing 30 of 30 sessions"),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Show 30 more" }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Showing 30 sessions — there may be more; narrow your search or change the day to see others.",
-      ),
-    ).toBeInTheDocument();
   });
 
   it("moves focus to the first newly revealed result when showing more", async () => {

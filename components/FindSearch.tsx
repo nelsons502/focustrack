@@ -377,10 +377,13 @@ export default function FindSearch() {
         <>
           <p className="results-meta">
             {showingText(visibleResults.length, results.length)}
-            {results.length >= FIND_RESULT_LIMIT
+            {results.length > FIND_RESULT_LIMIT
               ? " — there may be more; narrow your search or change the day to see others."
               : null}
           </p>
+          {results.length === FIND_RESULT_LIMIT ? (
+            <p className="results-meta">Showing the first 30 — narrow your search to see others.</p>
+          ) : null}
           <ul className="results" ref={resultsListRef}>
             {visibleResults.map((session) => (
               <li key={session.id} tabIndex={-1} className={styles.resultItem}>
@@ -407,8 +410,8 @@ export default function FindSearch() {
       ) : null}
 
       <p className="plan-note">
-        Your plan is saved on this device only. Nothing about your plan is
-        sent to a server.
+        Your notes, breaks, settings and reflections stay on this device.
+        Saved session IDs are used to look up times and rooms.
         {localState.plan.sessionIds.length > 0
           ? ` ${localState.plan.sessionIds.length} session${localState.plan.sessionIds.length === 1 ? "" : "s"} in your plan so far.`
           : ""}
