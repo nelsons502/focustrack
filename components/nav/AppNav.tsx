@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent, MouseEvent } from "react";
 import PrimaryNav from "../plan/PrimaryNav";
 import SettingsLink from "../SettingsLink";
+import PlayDayLink from "./PlayDayLink";
 
 const FOCUSABLE = "a[href], button:not([disabled])";
 
@@ -121,8 +122,14 @@ export default function AppNav() {
             Close
           </button>
         </div>
+        <p className="app-nav-group">
+          Your day
+        </p>
         <PrimaryNav />
-        <SettingsLink />
+        <div className="app-nav-foot">
+          <SettingsLink />
+          <PlayDayLink />
+        </div>
       </div>
     </div>
   );

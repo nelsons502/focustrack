@@ -88,12 +88,12 @@ describe("AppNav", () => {
   it("traps Tab inside the open menu", () => {
     render(<AppNav />);
     fireEvent.click(screen.getByRole("button", { name: "Menu" }));
-    const settings = screen.getByRole("link", { name: /Settings/ });
-    settings.focus();
-    fireEvent.keyDown(settings, { key: "Tab" });
+    const last = screen.getByRole("link", { name: "Play my day" });
+    last.focus();
+    fireEvent.keyDown(last, { key: "Tab" });
     expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
     fireEvent.keyDown(screen.getByRole("button", { name: "Close" }), { key: "Tab", shiftKey: true });
-    expect(settings).toHaveFocus();
+    expect(last).toHaveFocus();
   });
 
   it("marks the current link and keeps ?now= on every link", () => {
@@ -104,6 +104,20 @@ describe("AppNav", () => {
     expect(screen.getByRole("link", { name: "Find" })).not.toHaveAttribute("aria-current");
     const encoded = encodeURIComponent(NOW);
     expect(screen.getByRole("link", { name: "Now" })).toHaveAttribute("href", `/now?now=${encoded}`);
+    expect(screen.getByRole("link", { name: /Settings/ })).toHaveAttribute("href", `/settings?now=${encoded}`);
+    expect(screen.getByRole("link", { name: "Play my day" })).toHaveAttribute("href", `/demo?now=${encoded}`);
+    expect(screen.getByText("Your day")).toBeInTheDocument();
+  });
+
+  it("updates ?now= on links after popstate", () => {
+    render(<AppNav />);
+    const next = "2026-11-10T14:00-07:00";
+    act(() => {
+      window.history.pushState({}, "", `/now?now=${encodeURIComponent(next)}`);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    const encoded = encodeURIComponent(next);
+    expect(screen.getByRole("link", { name: "Play my day" })).toHaveAttribute("href", `/demo?now=${encoded}`);
     expect(screen.getByRole("link", { name: /Settings/ })).toHaveAttribute("href", `/settings?now=${encoded}`);
   });
 });
