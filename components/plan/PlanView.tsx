@@ -524,7 +524,9 @@ export default function PlanView() {
                       <p className="card-place">{planBreak.room}</p>
                       <p className="break-note">
                         Time to rest in the quiet room.
-                        {canIntervene && !conflictingBreakIds.has(planBreak.id)
+                        {canIntervene &&
+                        missingIds.length === 0 &&
+                        !conflictingBreakIds.has(planBreak.id)
                           ? " No session is scheduled here."
                           : null}
                       </p>

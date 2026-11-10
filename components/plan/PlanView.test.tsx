@@ -833,3 +833,19 @@ describe("PlanView", () => {
     ).toBeInTheDocument();
   });
 });
+
+it("does not assert a free break before saved session lookups resolve", () => {
+  savePlan(["s1"], {}, [gapBreak]);
+  vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => undefined)));
+  render(<PlanView />);
+  expect(screen.getByRole("heading", { name: "Quiet-room break" })).toBeInTheDocument();
+  expect(screen.queryByText(/No session is scheduled here/)).not.toBeInTheDocument();
+});
+
+it("does not assert a free break if saved sessions were not found", async () => {
+  savePlan(["s1"], {}, [gapBreak]);
+  mockSessions([]);
+  render(<PlanView />);
+  await screen.findByRole("heading", { name: "Saved sessions we could not find" });
+  expect(screen.queryByText(/No session is scheduled here/)).not.toBeInTheDocument();
+});
