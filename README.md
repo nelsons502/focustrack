@@ -112,4 +112,4 @@ Runtime AI: Elastic's built-in inference powers semantic search. Plain-language 
 
 ## License
 
-No project license has been selected yet.
+MIT — see [LICENSE](LICENSE). Schedule data belongs to CNCF / Sessionize and is not covered by this license.
