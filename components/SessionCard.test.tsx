@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Session } from "../lib/contract";
 import { ACCESSIBILITY_SOURCE_URL } from "../lib/event";
@@ -40,7 +40,17 @@ function renderCard(session: Session, inPlan = false) {
 
 describe("SessionCard accessibility facts", () => {
   it("shows sourced facts with one shared source link", () => {
-    renderCard(makeSession({ captions: "wordly-breakout" }));
+    const { container } = renderCard(
+      makeSession({ captions: "wordly-breakout" }),
+    );
+    const details = container.querySelector("details");
+    expect(details).not.toBeNull();
+    expect(details).not.toHaveAttribute("open");
+    expect(
+      within(details as HTMLElement).getByText(
+        "Accessibility at this venue",
+      ),
+    ).toBeInTheDocument();
     expect(
       screen.getByText("Live captions: Wordly (instructions in room)"),
     ).toBeInTheDocument();
@@ -50,12 +60,22 @@ describe("SessionCard accessibility facts", () => {
     expect(
       screen.getByText("Quiet room: Salt Palace, Level 2, 260A"),
     ).toBeInTheDocument();
+    expect(details?.textContent).toMatch(
+      /Live captions: Wordly \(instructions in room\)/,
+    );
+    expect(details?.textContent).toMatch(
+      /Reserved accessible seating in every session/,
+    );
+    expect(details?.textContent).toMatch(
+      /Quiet room: Salt Palace, Level 2, 260A/,
+    );
     expect(screen.queryByText(/Nearest quiet room/)).not.toBeInTheDocument();
     const links = screen.getAllByRole("link", {
       name: "KubeCon inclusion & accessibility page",
     });
     expect(links).toHaveLength(1);
     expect(links[0]).toHaveAttribute("href", ACCESSIBILITY_SOURCE_URL);
+    expect(details?.contains(links[0])).toBe(true);
   });
 
   it("does not claim captions when unconfirmed", () => {
@@ -68,11 +88,18 @@ describe("SessionCard accessibility facts", () => {
     const { container } = renderCard(makeSession());
     const details = container.querySelector("details");
     expect(details).not.toBeNull();
+    expect(details?.querySelector("summary")?.textContent).toBe(
+      "Accessibility at this venue",
+    );
     expect(details?.textContent).toMatch(/260B/);
     const outside = Array.from(container.querySelectorAll("li")).map(
       (li) => li.textContent,
     );
     expect(outside.join(" ")).not.toMatch(/260B/);
+    const articleText = container.querySelector("article")?.textContent ?? "";
+    expect(articleText.replace(details?.textContent ?? "", "")).not.toMatch(
+      /260B/,
+    );
   });
 
   it("labels estimates with their basis", () => {
@@ -137,21 +164,43 @@ describe("SessionCard interactions", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps the toggle label stable while reflecting plan state with aria-pressed", () => {
+  it("reads Add to plan or In your plan while reflecting plan state with aria-pressed", () => {
     const { rerender } = renderCard(makeSession(), false);
-    const buttonName = "Add to plan: Kubernetes Basics Test Session";
-    expect(screen.getByRole("button", { name: buttonName })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
+    expect(
+      screen.getByRole("button", {
+        name: "Add to plan: Kubernetes Basics Test Session",
+      }),
+    ).toHaveAttribute("aria-pressed", "false");
     rerender(
       <SessionCard session={makeSession()} inPlan onTogglePlan={vi.fn()} />,
     );
-    expect(screen.getByRole("button", { name: buttonName })).toHaveAttribute(
-      "aria-pressed",
-      "true",
+    expect(
+      screen.getByRole("button", {
+        name: "In your plan: Kubernetes Basics Test Session",
+      }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("puts title, time and room first, with smaller speakers and estimates as chips", () => {
+    const { container } = renderCard(
+      makeSession({
+        speakers: [{ name: "Ada Example", company: "Example Co" }],
+        crowdEstimate: "large",
+        crowdBasis: "ballroom",
+      }),
     );
-    expect(screen.getByText("In your plan", { selector: ".plan-state" })).toBeInTheDocument();
+    const text = container.querySelector("article")?.textContent ?? "";
+    expect(text.indexOf("Kubernetes Basics Test Session")).toBeLessThan(
+      text.indexOf("250 A"),
+    );
+    expect(text.indexOf("250 A")).toBeLessThan(text.indexOf("Ada Example"));
+    expect(
+      container.querySelector(".session-card__speakers"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Crowd: likely large (estimate: ballroom)")).toHaveClass(
+      "chip",
+    );
+    expect(screen.getByText("Noise: unknown")).toHaveClass("chip");
   });
 });
 
