@@ -1,0 +1,54 @@
+{
+  "apiVersion": "openslo/v1",
+  "kind": "SLO",
+  "metadata": {
+    "annotations": {
+      "dash0.com/display-name": "FocusTrack Search: 99% successful Elastic operations"
+    },
+    "labels": {
+      "dash0.com/dataset": "default",
+      "dash0.com/origin": "focustrack-search-availability-default"
+    },
+    "name": "focustrack-search-availability"
+  },
+  "spec": {
+    "budgetingMethod": "Occurrences",
+    "description": "Backend Elastic-operation availability (focustrack.elastic.operations, elastic_operation=search), NOT full HTTP availability. Valid only AFTER the service-identity fix rollout; historical pre-fix window data is unreliable (cumulative custom metrics collide across replicas). Do not claim SLO validity before the fix. Settling delay 5m per API docs.",
+    "indicator": {
+      "spec": {
+        "ratioMetric": {
+          "counter": true,
+          "good": {
+            "metricSource": {
+              "spec": {
+                "query": "{otel_metric_name=\"focustrack.elastic.operations\", elastic_operation=\"search\", otel_scope_name=\"focustrack-elastic\", instance!=\"\", outcome=\"success\"}"
+              },
+              "type": "Prometheus"
+            }
+          },
+          "total": {
+            "metricSource": {
+              "spec": {
+                "query": "{otel_metric_name=\"focustrack.elastic.operations\", elastic_operation=\"search\", otel_scope_name=\"focustrack-elastic\", instance!=\"\"}"
+              },
+              "type": "Prometheus"
+            }
+          }
+        }
+      }
+    },
+    "objectives": [
+      {
+        "displayName": "99% successful Elastic search operations over rolling 28d",
+        "target": 0.99
+      }
+    ],
+    "service": "focustrack",
+    "timeWindow": [
+      {
+        "duration": "28d",
+        "isRolling": true
+      }
+    ]
+  }
+}
