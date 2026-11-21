@@ -1,9 +1,8 @@
-import ExportCalendarButton from "../components/ExportCalendarButton";
 import FindSearch from "../components/FindSearch";
-import NowLink from "../components/NowLink";
 import ReflectLink from "../components/ReflectLink";
 import PrimaryNav from "../components/plan/PrimaryNav";
 import HomeTakeover from "../components/now/HomeTakeover";
+import HomeEntryCards from "../components/home/HomeEntryCards";
 
 const SCHEDULE_SOURCE_URL =
   "https://sessionize.com/api/v2/uo948i5p/view/markdown";
@@ -16,17 +15,18 @@ export default function HomePage() {
         <PrimaryNav current="find" />
         <h1>FocusTrack</h1>
         <p className="purpose">
-          Find the talks worth your attention, plan a day you can actually
-          finish, and stay present in the room.
+          Find a few talks worth your attention, plan a day you can actually
+          absorb, and stay present in the room.
         </p>
       </header>
-      <p className="now-link-row">
-        <NowLink />
-      </p>
+      <HomeEntryCards />
       <FindSearch />
-      <ExportCalendarButton />
       <ReflectLink />
       <footer className="credit">
+        <p className="home-privacy">
+          Your notes, breaks, settings and reflections stay on this device.
+          Saved session IDs are used to look up times and rooms.
+        </p>
         <a href={SCHEDULE_SOURCE_URL}>Schedule data: CNCF / Sessionize</a>
       </footer>
     </main>
