@@ -49,7 +49,11 @@ export function createMarkdownFetcher(cacheDirectory = '.cache') {
     try { cached = await readFile(file, 'utf8'); }
     catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error; }
     if (cached !== undefined && !markdownError(cached, relativeFile, url)) return cached;
-    await sleep(Math.max(0, 1000 - (Date.now() - lastRequestAt)));
+    let remaining = 1000 - (Date.now() - lastRequestAt);
+    while (remaining > 0) {
+      await sleep(remaining);
+      remaining = 1000 - (Date.now() - lastRequestAt);
+    }
     lastRequestAt = Date.now();
     const response = await fetch(url, {signal:AbortSignal.timeout(30_000)});
     if (!response.ok) throw new Error(`Sessionize fetch failed for ${relativeFile}: HTTP ${response.status}`);
